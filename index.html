@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 900px; margin: auto; }
+        .container { max-width: 950px; margin: auto; }
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
         h1, h2, h3 { margin: 0; color: #38bdf8; }
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -43,11 +43,10 @@
         .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
-        /* Targeted PDF Print Styles */
         @media print {
             body * { visibility: hidden; }
-            #printableArea, #printableArea * { visibility: visible; }
-            #printableArea { position: absolute; left: 0; top: 0; width: 100%; background: #fff; color: #000; padding: 20px; }
+            .printable-report, .printable-report * { visibility: visible; }
+            .printable-report { position: absolute; left: 0; top: 0; width: 100%; background: #fff; color: #000; padding: 20px; }
             table, th, td { border: 1px solid #000 !important; color: #000 !important; }
             th { background: #eee !important; color: #000 !important; }
         }
@@ -164,10 +163,10 @@
             </div>
         </div>
 
-        <!-- Form 3: Attendance Logs with Targeted PDF & Excel Export -->
-        <div class="section" id="printableArea">
+        <!-- Form 3: Attendance Logs with Export Dropdown -->
+        <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs & Report</h3>
+                <h3>📋 Monthly Attendance Logs</h3>
                 <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                     <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                         <option value="ALL">All Months</option>
@@ -187,10 +186,17 @@
                     <button onclick="openManualAttendanceModal()" class="btn-warning" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Manual Entry</button>
                 </div>
             </div>
-            <div style="display:flex; gap:10px; margin-bottom:10px;" class="no-print">
-                <button onclick="exportToCSV()" class="btn-warning" style="width:auto;">📥 Export Excel (CSV)</button>
-                <button onclick="exportToPDF()" class="btn-success" style="width:auto;">📄 Export PDF</button>
+            
+            <!-- Export Dropdown -->
+            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
+                <label style="margin:0; font-weight:bold;">Export Format:</label>
+                <select id="exportFormatSelect" style="width:auto; padding:8px;">
+                    <option value="excel">📥 Excel (CSV)</option>
+                    <option value="pdf">📄 PDF Document</option>
+                </select>
+                <button onclick="handleExport()" class="btn-success" style="width:auto; padding:8px 16px;">Export Report</button>
             </div>
+
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
@@ -205,6 +211,51 @@
                     </thead>
                     <tbody id="adminAttendanceTable">
                         <tr><td colspan="6">Loading logs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Form 4: Salary Calculation Sheet (Restored) -->
+        <div class="section printable-report">
+            <h3>💰 Monthly Salary Calculation Sheet</h3>
+            <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
+                <div class="form-group">
+                    <label>Select Month:</label>
+                    <select id="salMonth">
+                        <option value="01">Jan</option><option value="02">Feb</option>
+                        <option value="03">Mar</option><option value="04">Apr</option>
+                        <option value="05">May</option><option value="06">Jun</option>
+                        <option value="07">Jul</option><option value="08">Aug</option>
+                        <option value="09">Sep</option><option value="10" selected>Oct</option>
+                        <option value="11">Nov</option><option value="12">Dec</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select Year:</label>
+                    <select id="salYear">
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="calculateSalarySheet()" class="btn-success no-print" style="margin-bottom:15px;">⚡ Calculate Monthly Salary</button>
+            
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff Name</th>
+                            <th>Base Monthly Salary</th>
+                            <th>Present Days</th>
+                            <th>Half Days</th>
+                            <th>Effective Working Days</th>
+                            <th>Net Earned Salary</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salarySheetTable">
+                        <tr><td colspan="6">Select month/year and click calculate.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -327,11 +378,13 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
+    // Auto Face Scan Punch
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
         canvas.width = kioskVideo.videoWidth || 320;
         canvas.height = kioskVideo.videoHeight || 240;
-        canvas.getContext('2d').drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
         const imageBase64 = canvas.toDataURL('image/png');
 
         const statusBox = document.getElementById('punchStatusBox');
@@ -516,6 +569,32 @@
         } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading logs.</td></tr>'; }
     }
 
+    async function calculateSalarySheet() {
+        const month = document.getElementById('salMonth').value;
+        const year = document.getElementById('salYear').value;
+        const tbody = document.getElementById('salarySheetTable');
+
+        try {
+            const res = await fetch(`${API_URL}/salary/monthly-report?month=${month}&year=${year}`);
+            const result = await res.json();
+            if(!result.data || !result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No salary records for selected month.</td></tr>'; return; }
+
+            tbody.innerHTML = '';
+            result.data.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${item.staffName}</strong></td>
+                        <td>₹${item.monthlyBaseSalary}</td>
+                        <td>${item.shiftCompletedDays} Days</td>
+                        <td>${item.halfDays} Days</td>
+                        <td>${item.totalEffectiveDays} Days</td>
+                        <td style="color:#10b981; font-weight:bold;">₹${item.netPayableSalary}</td>
+                    </tr>
+                `;
+            });
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error calculating salaries.</td></tr>'; }
+    }
+
     async function loadTodayWorkingStatus() {
         const tbody = document.getElementById('todayWorkingTable');
         try {
@@ -565,8 +644,14 @@
         loadFilteredAttendanceLogs();
     }
 
-    function exportToCSV() { window.open(`${API_URL}/export/csv`, '_blank'); }
-    function exportToPDF() { window.print(); }
+    function handleExport() {
+        const format = document.getElementById('exportFormatSelect').value;
+        if(format === 'excel') {
+            window.open(`${API_URL}/export/csv`, '_blank');
+        } else if(format === 'pdf') {
+            window.print();
+        }
+    }
 
     initCameras();
     loadTodayWorkingStatus();

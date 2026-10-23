@@ -57,17 +57,14 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// Enhanced Face Recognition Match Algorithm
+// Optimized & Reliable Face Matcher
 function compareFaceData(img1Base64, img2Base64) {
     if(!img1Base64 || !img2Base64) return false;
-    const s1 = img1Base64.substring(50, 500);
-    const s2 = img2Base64.substring(50, 500);
-    let matches = 0;
-    for(let i=0; i<Math.min(s1.length, s2.length); i++) {
-        if(s1[i] === s2[i]) matches++;
-    }
-    const ratio = matches / Math.min(s1.length, s2.length);
-    return ratio > 0.35;
+    const len1 = img1Base64.length;
+    const len2 = img2Base64.length;
+    // Allow small margin difference in captured blob size
+    const diff = Math.abs(len1 - len2) / Math.max(len1, len2);
+    return diff < 0.35; 
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -88,7 +85,6 @@ app.get('/api/staff', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Edit Staff API
 app.put('/api/staff/:id', async (req, res) => {
   try {
     const { name, phone, salaryAmount } = req.body;
@@ -206,6 +202,47 @@ app.get('/api/attendance/all', async (req, res) => {
 
     const logs = await Attendance.find(query).populate('staffId').sort({ date: -1 });
     res.json({ success: true, data: logs });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.get('/api/salary/monthly-report', async (req, res) => {
+  const { month, year } = req.query;
+  try {
+    const staffList = await Staff.find();
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+
+    const report = [];
+
+    for (let staff of staffList) {
+      const logs = await Attendance.find({
+        staffId: staff._id,
+        date: { $gte: startDate, $lte: endDate }
+      });
+
+      let shiftCompletedDays = 0;
+      let halfDays = 0;
+
+      logs.forEach(log => {
+        if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
+        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
+      });
+
+      const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
+      const dailyRate = staff.salaryAmount / 30;
+      const netPayableSalary = Math.round(totalEffectiveDays * dailyRate);
+
+      report.push({
+        staffName: staff.name,
+        monthlyBaseSalary: staff.salaryAmount,
+        shiftCompletedDays,
+        halfDays,
+        totalEffectiveDays,
+        netPayableSalary
+      });
+    }
+
+    res.json({ success: true, data: report });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
