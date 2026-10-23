@@ -47,7 +47,22 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Helper Function: Append to CSV Ledger
+// Helper Function: Send Data to Google Apps Script (Sheet & Drive Sync)
+async function sendToGoogleScript(payload) {
+  try {
+    const scriptUrl = process.env.GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbzoOe9P43oK62Mg12e3WegbbIL9jb234Jiz_26wEoPertZfizslL0j_kANUMkxpGWzqmg/exec";
+    await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log('✅ Synced to Google Sheet & Drive via Apps Script!');
+  } catch (err) {
+    console.log('❌ Google Sync Error:', err.message);
+  }
+}
+
+// Helper Function: Append to Local CSV Ledger
 function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
     console.log(`[Google Drive Excel Sync] Folder ID (1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0) -> Logged: ${rowText}`);
@@ -61,8 +76,18 @@ app.post('/api/staff', async (req, res) => {
     const staff = new Staff(req.body);
     await staff.save();
 
-    const row = `STAFF_REGISTER,${staff.name},${staff.phone},${new Date().toISOString().split('T')[0]},ACTIVE,${staff.salaryAmount},1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0,N/A`;
+    const todayDate = new Date().toISOString().split('T')[0];
+    const row = `STAFF_REGISTER,${staff.name},${staff.phone},${todayDate},ACTIVE,${staff.salaryAmount},1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0,N/A`;
     appendToExcelLedger(row);
+
+    // Google Apps Script Sync
+    await sendToGoogleScript({
+      action: 'STAFF_REGISTER',
+      name: staff.name,
+      phone: staff.phone,
+      salaryAmount: staff.salaryAmount,
+      date: todayDate
+    });
 
     res.status(201).json({ success: true, message: 'Staff added & synced to Drive!', data: staff });
   } catch (err) {
@@ -109,6 +134,16 @@ app.post('/api/face-punch', async (req, res) => {
 
     const row = `FACE_PUNCH_LOG,${staff.name},${staff.phone},${today},PRESENT,${staff.salaryAmount},1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0,1RoAc06fNeO7HqGCVuyqfCFIOUhHf3bUG/${fileName}`;
     appendToExcelLedger(row);
+
+    // Google Apps Script Sync
+    await sendToGoogleScript({
+      action: 'FACE_PUNCH',
+      name: staff.name,
+      phone: staff.phone,
+      salaryAmount: staff.salaryAmount,
+      image: image,
+      date: today
+    });
 
     res.json({ success: true, message: 'Face punch attendance recorded successfully!', data: attendance });
   } catch (err) {
