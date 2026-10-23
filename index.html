@@ -25,7 +25,7 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        video { width: 100%; max-height: 220px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
+        video { width: 100%; max-height: 200px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
@@ -38,7 +38,7 @@
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; text-align: left; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 480px; text-align: left; }
         
         .thumb-img { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
@@ -188,8 +188,14 @@
                 <div>
                     <div class="form-group">
                         <label>Staff Photo (Proof/Identity):</label>
+                        <video id="regStaffCam" autoplay playsinline style="display:none; max-height:120px; width:100%; margin-bottom:5px;"></video>
+                        <div style="display:flex; gap:5px;">
+                            <button type="button" onclick="startRegCamera()" class="btn-warning" style="padding:6px; font-size:12px;">📷 Open Live Camera</button>
+                            <button type="button" onclick="captureRegCamera()" id="regCapBtn" class="btn-success" style="display:none; padding:6px; font-size:12px;">📸 Capture Photo</button>
+                        </div>
+                        <p style="font-size:11px; color:#94a3b8; margin:5px 0;">OR Select File:</p>
                         <input type="file" id="regPhotoInput" accept="image/*" onchange="handleStaffPhotoSelect(event)">
-                        <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Photo Uploaded</span>
+                        <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Photo Ready</span>
                     </div>
                     <div class="form-group">
                         <label>Attach Staff Document (Aadhaar/PAN/PDF):</label>
@@ -225,10 +231,10 @@
             </div>
         </div>
 
-        <!-- BOX 4: ATTENDANCE LOGS WITH PUNCH PHOTOS & IST TIME -->
+        <!-- BOX 4: ATTENDANCE LOGS -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs (With Photos & IST Time)</h3>
+                <h3>📋 Monthly Attendance Logs</h3>
                 <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                     <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                         <option value="ALL">All Months</option>
@@ -351,10 +357,10 @@
     </div>
 </div>
 
-<!-- Modal: Edit Staff -->
+<!-- Modal: Edit Staff (Details, PIN, Photo, Document) -->
 <div id="editStaffModal" class="modal">
     <div class="modal-content">
-        <h3>✏️ Edit Staff Details & PIN</h3>
+        <h3>✏️ Edit Staff Directory Entry</h3>
         <input type="hidden" id="editStaffId">
         <div class="form-group">
             <label>Full Name:</label>
@@ -371,6 +377,18 @@
         <div class="form-group">
             <label>Staff Attendance PIN:</label>
             <input type="text" id="editPin">
+        </div>
+
+        <div class="form-group" style="border:1px solid #334155; padding:8px; border-radius:6px; margin-top:8px;">
+            <label>Update Staff Photo:</label>
+            <input type="file" id="editPhotoInput" accept="image/*" onchange="handleEditPhotoSelect(event)">
+            <span id="editPhotoBadge" style="display:none; color:#10b981; font-size:11px; font-weight:bold;">✅ New Photo Ready</span>
+        </div>
+
+        <div class="form-group" style="border:1px solid #334155; padding:8px; border-radius:6px; margin-top:8px;">
+            <label>Update Document File:</label>
+            <input type="file" id="editDocInput" accept="image/*,.pdf" onchange="handleEditDocSelect(event)">
+            <span id="editDocBadge" style="display:none; color:#10b981; font-size:11px; font-weight:bold;">✅ New Doc Attached</span>
         </div>
 
         <button onclick="updateStaffDetails()" class="btn-success" style="margin-top:10px;">Save Updated Profile</button>
@@ -435,10 +453,13 @@
     let isAdminLoggedIn = false;
     let registeredDocBase64 = '';
     let registeredPhotoBase64 = '';
+    let editUpdatedPhotoBase64 = '';
+    let editUpdatedDocBase64 = '';
     let currentVerifiedStaff = null;
     let cachedStaffList = [];
 
     const kioskVideo = document.getElementById('kioskVideo');
+    const regStaffCam = document.getElementById('regStaffCam');
 
     function initCameras() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -446,6 +467,26 @@
                 .then(stream => { kioskVideo.srcObject = stream; })
                 .catch(err => console.warn("Camera access needed!"));
         }
+    }
+
+    function startRegCamera() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                .then(stream => {
+                    regStaffCam.srcObject = stream;
+                    regStaffCam.style.display = 'block';
+                    document.getElementById('regCapBtn').style.display = 'inline-block';
+                });
+        }
+    }
+
+    function captureRegCamera() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 300; canvas.height = 300;
+        canvas.getContext('2d').drawImage(regStaffCam, 0, 0, canvas.width, canvas.height);
+        registeredPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
+        document.getElementById('photoBadge').style.display = 'inline';
+        alert('✅ Staff Photo Captured!');
     }
 
     function toggleView() {
@@ -483,7 +524,7 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // Step 1: Verify PIN & Display Staff Name
+    // Step 1: Verify PIN
     async function verifyPinAndShowName() {
         const pin = document.getElementById('staffPinInput').value;
         const nameBox = document.getElementById('staffNameDisplayBox');
@@ -520,7 +561,7 @@
         }
     }
 
-    // Step 2 & 3: Capture Photo + Get GPS + Submit Punch
+    // Step 2 & 3: Submit Punch
     function captureAndSubmitPunch() {
         const pin = document.getElementById('staffPinInput').value;
         const statusBox = document.getElementById('punchStatusBox');
@@ -531,7 +572,7 @@
         canvas.width = 240; canvas.height = 240;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5); // Compressed Image
 
         statusBox.style.display = 'block';
         statusBox.innerHTML = '⏳ Fetching Location & Verifying Coordinates...';
@@ -576,25 +617,76 @@
         }
     }
 
+    // Auto Image Compressor for File Input
+    function compressAndConvertImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 500;
+                if (width > height) {
+                    if (width > maxDim) { height *= maxDim / width; width = maxDim; }
+                } else {
+                    if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                }
+                canvas.width = width; canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', 0.5));
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
     function handleStaffPhotoSelect(e) {
         const file = e.target.files[0];
         if(file) {
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                registeredPhotoBase64 = evt.target.result;
+            compressAndConvertImage(file, function(base64) {
+                registeredPhotoBase64 = base64;
                 document.getElementById('photoBadge').style.display = 'inline';
-            };
-            reader.readAsDataURL(file);
+            });
         }
     }
 
     function handleDocSelect(e) {
         const file = e.target.files[0];
         if(file) {
+            if(file.type.includes('image')) {
+                compressAndConvertImage(file, function(base64) {
+                    registeredDocBase64 = base64;
+                    document.getElementById('docBadge').style.display = 'inline';
+                });
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    registeredDocBase64 = evt.target.result;
+                    document.getElementById('docBadge').style.display = 'inline';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    }
+
+    function handleEditPhotoSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
+            compressAndConvertImage(file, function(base64) {
+                editUpdatedPhotoBase64 = base64;
+                document.getElementById('editPhotoBadge').style.display = 'inline';
+            });
+        }
+    }
+
+    function handleEditDocSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
             const reader = new FileReader();
             reader.onload = function(evt) {
-                registeredDocBase64 = evt.target.result;
-                document.getElementById('docBadge').style.display = 'inline';
+                editUpdatedDocBase64 = evt.target.result;
+                document.getElementById('editDocBadge').style.display = 'inline';
             };
             reader.readAsDataURL(file);
         }
@@ -642,7 +734,6 @@
         loadFilteredAttendanceLogs();
     }
 
-    // 📍 LOCATION MANAGEMENT LOGIC
     async function loadAllowedLocations() {
         const tbody = document.getElementById('allowedLocationsTable');
         try {
@@ -750,6 +841,9 @@
         document.getElementById('editPhone').value = phone;
         document.getElementById('editSalary').value = salary;
         document.getElementById('editPin').value = pin;
+        document.getElementById('editPhotoBadge').style.display = 'none';
+        document.getElementById('editDocBadge').style.display = 'none';
+        editUpdatedPhotoBase64 = ''; editUpdatedDocBase64 = '';
         document.getElementById('editStaffModal').style.display = 'flex';
     }
 
@@ -760,15 +854,19 @@
         const salaryAmount = document.getElementById('editSalary').value;
         const pin = document.getElementById('editPin').value;
 
+        const payload = { name, phone, salaryAmount, pin };
+        if(editUpdatedPhotoBase64) payload.photo = editUpdatedPhotoBase64;
+        if(editUpdatedDocBase64) payload.documentFile = editUpdatedDocBase64;
+
         try {
             const res = await fetch(`${API_URL}/staff/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, phone, salaryAmount, pin })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if(data.success) {
-                alert('Staff Details & PIN updated!');
+                alert('Staff Entry updated successfully!');
                 closeModal('editStaffModal');
                 loadStaffDirectory();
             } else { alert('Error: ' + data.error); }

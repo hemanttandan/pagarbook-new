@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' })); // Increased Limit for Safe Payload Processing
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(cors());
 
 app.use(express.static(__dirname));
@@ -56,15 +57,12 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Helper function to extract Lat/Lng from Google Maps URL or text
 function parseCoordinates(inputStr) {
     if (!inputStr) return null;
-    // Check if direct Lat,Lng e.g., "21.2514, 81.6296"
     const coordMatch = inputStr.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
     if (coordMatch) {
         return { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
     }
-    // Default fallback coordinates if short URL without embed API
     return { lat: 21.2514, lng: 81.6296 };
 }
 
@@ -82,7 +80,7 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 
 async function isWithinAllowedLocations(userLat, userLng) {
     const locations = await Location.find();
-    if (!locations.length) return true; // If no location set, allow all by default
+    if (!locations.length) return true; // Default allow if no locations added yet
 
     for (let loc of locations) {
         let distKm = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
@@ -175,8 +173,12 @@ app.get('/api/staff', async (req, res) => {
 
 app.put('/api/staff/:id', async (req, res) => {
   try {
-    const { name, phone, salaryAmount, pin } = req.body;
-    const staff = await Staff.findByIdAndUpdate(req.params.id, { name, phone, salaryAmount, pin }, { new: true });
+    const { name, phone, salaryAmount, pin, photo, documentFile } = req.body;
+    const updateObj = { name, phone, salaryAmount, pin };
+    if (photo) updateObj.photo = photo;
+    if (documentFile) updateObj.documentFile = documentFile;
+
+    const staff = await Staff.findByIdAndUpdate(req.params.id, updateObj, { new: true });
     res.json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
