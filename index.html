@@ -69,10 +69,13 @@
     <div id="staffKioskSection">
         <div class="grid-2">
             <div class="section">
-                <h3>📸 Face Auto Recognition Punch</h3>
-                <p style="font-size:12px; color:#94a3b8;">Camera ke saamne dekhein aur punch karein</p>
+                <h3>📸 Face Recognition / 👆 Tap Finger Punch</h3>
+                <p style="font-size:12px; color:#94a3b8;">Face scan karein ya neeche staff select karke Direct Punch karein</p>
                 <video id="kioskVideo" autoplay playsinline></video>
-                <button onclick="autoScanAndPunch()" class="btn-success" style="margin-top:12px;">📸 Scan Face & Punch IN/OUT</button>
+                <div style="display:flex; gap:10px; margin-top:12px;">
+                    <button onclick="autoScanAndPunch()" class="btn-success">📸 Scan Face Punch</button>
+                    <button onclick="openTapPunchModal()" class="btn-warning">👆 Tap / Finger Punch</button>
+                </div>
                 <div id="punchStatusBox" class="status-box" style="display:none;"></div>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
             </div>
@@ -107,9 +110,9 @@
             </div>
         </div>
 
-        <!-- Form 1: Register New Staff -->
+        <!-- Form 1: Register New Staff (Face Camera Only) -->
         <div class="section no-print">
-            <h3>➕ Register New Staff Form</h3>
+            <h3>➕ Register New Staff Form (Face Capture)</h3>
             <div class="grid-2">
                 <div>
                     <div class="form-group">
@@ -127,15 +130,11 @@
                 </div>
                 <div>
                     <div class="form-group">
-                        <label>Face Attachment (Choose File):</label>
-                        <input type="file" id="regFileInput" accept="image/*" onchange="handleFileSelect(event)">
+                        <label>Live Face Camera Capture:</label>
+                        <video id="regVideo" autoplay playsinline style="max-height:140px;"></video>
+                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:8px;">📷 Capture Staff Face</button>
                     </div>
-                    <div class="form-group">
-                        <label>Or Live Camera Capture:</label>
-                        <video id="regVideo" autoplay playsinline style="max-height:90px;"></video>
-                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:5px; padding:5px;">📷 Capture Face</button>
-                    </div>
-                    <div id="faceCapturedBadge" style="display:none; color:#10b981; font-weight:bold; margin-top:5px;">✅ Face Image Attached!</div>
+                    <div id="faceCapturedBadge" style="display:none; color:#10b981; font-weight:bold; margin-top:5px;">✅ Face Captured Successfully!</div>
                 </div>
             </div>
             <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Master</button>
@@ -298,6 +297,19 @@
     </div>
 </div>
 
+<!-- Modal: Tap / Finger Punch -->
+<div id="tapPunchModal" class="modal">
+    <div class="modal-content">
+        <h3>👆 Tap / Finger Punch (Quick Mode)</h3>
+        <div class="form-group" style="margin-top:15px;">
+            <label>Select Active Staff:</label>
+            <select id="tapStaffSelect"><option>Loading staff...</option></select>
+        </div>
+        <button onclick="submitTapPunch()" class="btn-success">Confirm IN / OUT Punch</button>
+        <button onclick="closeModal('tapPunchModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
+    </div>
+</div>
+
 <!-- Modal: Edit Punch Time -->
 <div id="editPunchModal" class="modal">
     <div class="modal-content">
@@ -398,11 +410,11 @@
 
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 100;
-        canvas.height = 100;
+        canvas.width = 120;
+        canvas.height = 120;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const imageBase64 = canvas.toDataURL('image/jpeg', 0.5);
+        const imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
         const statusBox = document.getElementById('punchStatusBox');
         statusBox.style.display = 'block';
@@ -419,29 +431,17 @@
                 statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
                 loadTodayWorkingStatus();
             } else {
-                statusBox.innerHTML = `❌ ${result.error}`;
+                statusBox.innerHTML = `❌ ${result.error} (Try Tap/Finger Punch)`;
             }
         } catch(err) { statusBox.innerHTML = '❌ Face match failed!'; }
     }
 
-    function handleFileSelect(e) {
-        const file = e.target.files[0];
-        if(file) {
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                registeredFaceBase64 = evt.target.result;
-                document.getElementById('faceCapturedBadge').style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-
     function captureLiveFace() {
         const canvas = document.createElement('canvas');
-        canvas.width = 100;
-        canvas.height = 100;
+        canvas.width = 120;
+        canvas.height = 120;
         canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
-        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.5);
+        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
         document.getElementById('faceCapturedBadge').style.display = 'block';
     }
 
@@ -451,7 +451,7 @@
         const salaryAmount = document.getElementById('regSalary').value;
 
         if(!name || !phone || !salaryAmount || !registeredFaceBase64) {
-            alert('Please fill details AND attach/capture a face photo!');
+            alert('Please fill details AND capture face using camera!');
             return;
         }
 
@@ -467,12 +467,47 @@
                 document.getElementById('regName').value = '';
                 document.getElementById('regPhone').value = '';
                 document.getElementById('regSalary').value = '';
-                document.getElementById('regFileInput').value = '';
                 registeredFaceBase64 = '';
                 document.getElementById('faceCapturedBadge').style.display = 'none';
                 loadAdminData();
             } else { alert('Error: ' + data.error); }
         } catch(err) { alert('Registration failed!'); }
+    }
+
+    async function openTapPunchModal() {
+        try {
+            const res = await fetch(`${API_URL}/staff`);
+            const result = await res.json();
+            if(result.success) {
+                const select = document.getElementById('tapStaffSelect');
+                select.innerHTML = '';
+                result.data.forEach(s => {
+                    if(s.status !== 'inactive') {
+                        select.innerHTML += `<option value="${s._id}">${s.name} (${s.phone})</option>`;
+                    }
+                });
+                document.getElementById('tapPunchModal').style.display = 'flex';
+            }
+        } catch(err) { alert('Could not load staff list'); }
+    }
+
+    async function submitTapPunch() {
+        const staffId = document.getElementById('tapStaffSelect').value;
+        try {
+            const res = await fetch(`${API_URL}/tap-punch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ staffId })
+            });
+            const result = await res.json();
+            if(result.success) {
+                alert(`✅ PUNCH ${result.data.type} SUCCESSFUL for ${result.data.staffName} at ${result.data.time}`);
+                closeModal('tapPunchModal');
+                loadTodayWorkingStatus();
+            } else {
+                alert('❌ ' + result.error);
+            }
+        } catch(err) { alert('Tap punch failed!'); }
     }
 
     async function loadAdminData() {

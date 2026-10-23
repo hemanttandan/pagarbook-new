@@ -49,6 +49,11 @@ function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
 }
 
+function getLocalCurrentTime() {
+    const now = new Date();
+    return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 function calculateHours(time1, time2) {
     if(!time1 || !time2) return 0;
     const [h1, m1] = time1.split(':').map(Number);
@@ -57,29 +62,23 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// 🛡️ Optimized Face Matching Engine (Active Staff Only)
+// Face Matcher
 function compareFaceData(liveImageBase64, registeredImageBase64) {
     if (!liveImageBase64 || !registeredImageBase64) return false;
-    
     const cleanLive = liveImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
     const cleanReg = registeredImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
 
-    // Simple robust substring sample check for fast validation
-    let matchCount = 0;
-    const sampleSize = 30;
-    const step = Math.floor(Math.min(cleanLive.length, cleanReg.length) / sampleSize);
+    const lenRatio = Math.min(cleanLive.length, cleanReg.length) / Math.max(cleanLive.length, cleanReg.length);
+    if (lenRatio < 0.4) return false;
 
-    if(step <= 0) return true;
-
+    let matches = 0;
+    const sampleSize = 40;
+    const step = Math.floor(cleanReg.length / sampleSize);
     for (let i = 0; i < sampleSize; i++) {
         const idx = i * step;
-        if (cleanLive.substring(idx, idx + 5) === cleanReg.substring(idx, idx + 5)) {
-            matchCount++;
-        }
+        if (cleanLive[idx] === cleanReg[idx]) matches++;
     }
-
-    // Allow recognition if at least 15% pattern chunks match
-    return (matchCount / sampleSize) >= 0.15;
+    return (matches / sampleSize) >= 0.10;
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -124,7 +123,7 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Auto Face Recognition Punch - Strictly for ACTIVE Staff Only
+// Auto Face Recognition Punch
 app.post('/api/face-punch-auto', async (req, res) => {
   const { image } = req.body;
   try {
@@ -139,12 +138,11 @@ app.post('/api/face-punch-auto', async (req, res) => {
     }
 
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Face Not Recognized or Staff is Inactive!' });
+        return res.status(404).json({ success: false, error: 'Face Not Recognized!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const timeNow = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const timeNow = getLocalCurrentTime();
 
     let record = await Attendance.findOne({ staffId: matchedStaff._id, date: today });
     let punchType = 'IN';
@@ -163,7 +161,46 @@ app.post('/api/face-punch-auto', async (req, res) => {
       await record.save();
       appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
     } else {
-      return res.status(400).json({ success: false, error: `Today's IN & OUT completed for ${matchedStaff.name}!` });
+      return res.status(400).json({ success: false, error: `Today's IN & OUT completed!` });
+    }
+
+    res.json({
+      success: true,
+      data: { staffName: matchedStaff.name, type: punchType, time: timeNow, workHours: record.workHours }
+    });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
+// Tap / Finger Direct Punch API (Alternative to Face)
+app.post('/api/tap-punch', async (req, res) => {
+  const { staffId } = req.body;
+  try {
+    const matchedStaff = await Staff.findById(staffId);
+    if (!matchedStaff || matchedStaff.status !== 'active') {
+        return res.status(404).json({ success: false, error: 'Staff not found or inactive!' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const timeNow = getLocalCurrentTime();
+
+    let record = await Attendance.findOne({ staffId: matchedStaff._id, date: today });
+    let punchType = 'IN';
+
+    if (!record) {
+      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, status: 'present' });
+      await record.save();
+      appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,PRESENT`);
+    } else if (!record.punchOut) {
+      punchType = 'OUT';
+      record.punchOut = timeNow;
+      record.workHours = calculateHours(record.punchIn, timeNow);
+      if (record.workHours < 5) record.status = 'half_day';
+      else record.status = 'present';
+
+      await record.save();
+      appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
+    } else {
+      return res.status(400).json({ success: false, error: `Today's IN & OUT already completed for ${matchedStaff.name}!` });
     }
 
     res.json({
@@ -212,7 +249,7 @@ app.get('/api/attendance/today', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-app.get('/api/attendance/all', async (req, res, next) => {
+app.get('/api/attendance/all', async (req, res) => {
   const { month, year } = req.query;
   try {
     let query = {};
