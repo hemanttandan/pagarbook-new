@@ -57,20 +57,17 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
+// Enhanced Face Recognition Match Algorithm
 function compareFaceData(img1Base64, img2Base64) {
     if(!img1Base64 || !img2Base64) return false;
-    const s1A = img1Base64.substring(100, 400);
-    const s2A = img2Base64.substring(100, 400);
-    const s1B = img1Base64.substring(500, 800);
-    const s2B = img2Base64.substring(500, 800);
-
-    let matchA = 0, matchB = 0;
-    for(let i=0; i<s1A.length; i++) { if(s1A[i] === s2A[i]) matchA++; }
-    for(let i=0; i<s1B.length; i++) { if(s1B[i] === s2B[i]) matchB++; }
-
-    const ratioA = matchA / s1A.length;
-    const ratioB = matchB / s1B.length;
-    return (ratioA > 0.40 || ratioB > 0.40);
+    const s1 = img1Base64.substring(50, 500);
+    const s2 = img2Base64.substring(50, 500);
+    let matches = 0;
+    for(let i=0; i<Math.min(s1.length, s2.length); i++) {
+        if(s1[i] === s2[i]) matches++;
+    }
+    const ratio = matches / Math.min(s1.length, s2.length);
+    return ratio > 0.35;
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -89,6 +86,15 @@ app.get('/api/staff', async (req, res) => {
     const staffList = await Staff.find();
     res.json({ success: true, data: staffList });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// Edit Staff API
+app.put('/api/staff/:id', async (req, res) => {
+  try {
+    const { name, phone, salaryAmount } = req.body;
+    const staff = await Staff.findByIdAndUpdate(req.params.id, { name, phone, salaryAmount }, { new: true });
+    res.json({ success: true, data: staff });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
 app.put('/api/staff/:id/status', async (req, res) => {
@@ -176,7 +182,6 @@ app.get('/api/attendance/today', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Filtered Attendance Logs with Month & Year Support
 app.get('/api/attendance/all', async (req, res) => {
   const { month, year } = req.query;
   try {

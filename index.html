@@ -43,10 +43,11 @@
         .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
+        /* Targeted PDF Print Styles */
         @media print {
-            body { background: #fff; color: #000; }
-            .no-print { display: none !important; }
-            .section { background: #fff !important; box-shadow: none !important; border: none !important; }
+            body * { visibility: hidden; }
+            #printableArea, #printableArea * { visibility: visible; }
+            #printableArea { position: absolute; left: 0; top: 0; width: 100%; background: #fff; color: #000; padding: 20px; }
             table, th, td { border: 1px solid #000 !important; color: #000 !important; }
             th { background: #eee !important; color: #000 !important; }
         }
@@ -108,7 +109,7 @@
         </div>
 
         <!-- Form 1: Register New Staff -->
-        <div class="section">
+        <div class="section no-print">
             <h3>➕ Register New Staff Form</h3>
             <div class="grid-2">
                 <div>
@@ -142,8 +143,8 @@
         </div>
 
         <!-- Form 2: Registered Staff Directory -->
-        <div class="section">
-            <h3>👥 Registered Staff Directory (Active/Inactive)</h3>
+        <div class="section no-print">
+            <h3>👥 Registered Staff Directory</h3>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
@@ -152,7 +153,7 @@
                             <th>Name</th>
                             <th>Phone</th>
                             <th>Salary</th>
-                            <th>Status (Click to Toggle)</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -163,10 +164,10 @@
             </div>
         </div>
 
-        <!-- Form 3: Attendance Logs with Month & Year Filter -->
-        <div class="section">
+        <!-- Form 3: Attendance Logs with Targeted PDF & Excel Export -->
+        <div class="section" id="printableArea">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs & Export</h3>
+                <h3>📋 Monthly Attendance Logs & Report</h3>
                 <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                     <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                         <option value="ALL">All Months</option>
@@ -187,8 +188,8 @@
                 </div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:10px;" class="no-print">
-                <button onclick="exportToCSV()" class="btn-warning" style="width:auto;">📥 Download Attendance Excel (CSV)</button>
-                <button onclick="window.print()" class="btn-success" style="width:auto;">🖨️ Print / Export Attendance PDF</button>
+                <button onclick="exportToCSV()" class="btn-warning" style="width:auto;">📥 Export Excel (CSV)</button>
+                <button onclick="exportToPDF()" class="btn-success" style="width:auto;">📄 Export PDF</button>
             </div>
             <div style="overflow-x: auto;">
                 <table>
@@ -208,15 +209,6 @@
                 </table>
             </div>
         </div>
-
-        <!-- Form 4: Salary Calculation & PDF Export Form -->
-        <div class="section">
-            <h3>📊 Salary Calculation & PDF Report</h3>
-            <div class="no-print" style="margin-bottom: 10px;">
-                <button onclick="window.print()" class="btn-success" style="width:auto;">🖨️ Print / Export Salary Report PDF</button>
-            </div>
-            <p style="font-size: 13px; color: #94a3b8;">Note: Click the button above to generate a professional PDF report of attendance and salary sheets using your browser's Print-to-PDF feature.</p>
-        </div>
     </div>
 </div>
 
@@ -230,6 +222,28 @@
         </div>
         <button onclick="verifyAdminLogin()" class="btn-success">Unlock Admin Panel</button>
         <button onclick="closeModal('loginModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
+    </div>
+</div>
+
+<!-- Modal: Edit Staff -->
+<div id="editStaffModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ Edit Staff Details</h3>
+        <input type="hidden" id="editStaffId">
+        <div class="form-group">
+            <label>Full Name:</label>
+            <input type="text" id="editName">
+        </div>
+        <div class="form-group">
+            <label>Phone Number:</label>
+            <input type="text" id="editPhone">
+        </div>
+        <div class="form-group">
+            <label>Monthly Salary (₹):</label>
+            <input type="number" id="editSalary">
+        </div>
+        <button onclick="updateStaffDetails()" class="btn-success">Update Staff</button>
+        <button onclick="closeModal('editStaffModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
 </div>
 
@@ -419,12 +433,44 @@
                             <td>${staff.phone}</td>
                             <td>₹${staff.salaryAmount}</td>
                             <td><span class="badge ${statusBadgeClass}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${statusText}</span></td>
-                            <td><button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button></td>
+                            <td>
+                                <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount})" class="btn-warning" style="padding:4px 8px; font-size:12px; margin-bottom:4px;">Edit</button>
+                                <button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button>
+                            </td>
                         </tr>
                     `;
                 });
             }
         } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading directory.</td></tr>'; }
+    }
+
+    function openEditStaff(id, name, phone, salary) {
+        document.getElementById('editStaffId').value = id;
+        document.getElementById('editName').value = name;
+        document.getElementById('editPhone').value = phone;
+        document.getElementById('editSalary').value = salary;
+        document.getElementById('editStaffModal').style.display = 'flex';
+    }
+
+    async function updateStaffDetails() {
+        const id = document.getElementById('editStaffId').value;
+        const name = document.getElementById('editName').value;
+        const phone = document.getElementById('editPhone').value;
+        const salaryAmount = document.getElementById('editSalary').value;
+
+        try {
+            const res = await fetch(`${API_URL}/staff/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone, salaryAmount })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert('Staff updated successfully!');
+                closeModal('editStaffModal');
+                loadStaffDirectory();
+            } else { alert('Error: ' + data.error); }
+        } catch(err) { alert('Update failed!'); }
     }
 
     async function toggleStaffStatus(id, currentStatus) {
@@ -520,6 +566,7 @@
     }
 
     function exportToCSV() { window.open(`${API_URL}/export/csv`, '_blank'); }
+    function exportToPDF() { window.print(); }
 
     initCameras();
     loadTodayWorkingStatus();
