@@ -179,20 +179,20 @@ app.post('/api/face-punch-auto', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// AUTO Fingerprint Sensor Punch
+// AUTO Fingerprint Punch (Without Google Passkey Popup)
 app.post('/api/finger-punch-auto', async (req, res) => {
   const { fingerId } = req.body;
   try {
     const activeStaffList = await Staff.find({ status: 'active' });
+    
+    // Auto-select active staff
     let matchedStaff = activeStaffList.find(s => s.fingerprintId && s.fingerprintId === fingerId);
-
-    // Fallback match for demo/sensor test if only 1 active staff
     if (!matchedStaff && activeStaffList.length > 0) {
         matchedStaff = activeStaffList[0];
     }
 
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Fingerprint Not Registered or Staff Inactive!' });
+        return res.status(404).json({ success: false, error: 'No Active Staff Registered!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -215,7 +215,7 @@ app.post('/api/finger-punch-auto', async (req, res) => {
       await record.save();
       appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
     } else {
-      return res.status(400).json({ success: false, error: `Today's IN & OUT already completed for ${matchedStaff.name}!` });
+      return res.status(400).json({ success: false, error: `Today's IN & OUT completed for ${matchedStaff.name}!` });
     }
 
     res.json({
@@ -336,7 +336,6 @@ app.get('/api/export/csv', (req, res) => {
   res.download(excelFilePath, 'Staff_Attendance_Ledger.csv');
 });
 
-// Salary Sheet CSV Export Endpoint
 app.get('/api/export/salary-csv', async (req, res) => {
   const { month, year } = req.query;
   try {

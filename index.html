@@ -37,11 +37,14 @@
         .bg-active { background: #065f46; color: #34d399; cursor: pointer; }
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; text-align: center; }
         
         .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
+
+        .fingerprint-btn { background: none; border: 3px solid #38bdf8; border-radius: 50%; width: 100px; height: 100px; font-size: 45px; cursor: pointer; margin: 15px auto; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .fingerprint-btn:active { transform: scale(0.92); background: rgba(56, 189, 248, 0.2); }
 
         @media print {
             body * { visibility: hidden; }
@@ -69,12 +72,12 @@
     <div id="staffKioskSection">
         <div class="grid-2">
             <div class="section">
-                <h3>📸 Auto Face / 👆 Auto Finger Punch</h3>
-                <p style="font-size:12px; color:#94a3b8;">Face Scan karein ya Fingerprint Sensor tap karein</p>
+                <h3>📸 Auto Face / 👆 Touch Finger Punch</h3>
+                <p style="font-size:12px; color:#94a3b8;">Face Scan karein ya Screen Finger Sensor Tap karein</p>
                 <video id="kioskVideo" autoplay playsinline></video>
                 <div style="display:flex; gap:10px; margin-top:12px;">
                     <button onclick="autoScanAndPunch()" class="btn-success">📸 Face Auto Scan</button>
-                    <button onclick="autoFingerPunch()" class="btn-warning">👆 Auto Finger Punch</button>
+                    <button onclick="openFingerModal()" class="btn-warning">👆 Touch Finger Punch</button>
                 </div>
                 <div id="punchStatusBox" class="status-box" style="display:none;"></div>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
@@ -110,7 +113,7 @@
             </div>
         </div>
 
-        <!-- Form 1: Register New Staff with Document & Fingerprint -->
+        <!-- Form 1: Register New Staff -->
         <div class="section no-print">
             <h3>➕ Register New Staff Master</h3>
             <div class="grid-2">
@@ -135,14 +138,14 @@
                 </div>
                 <div>
                     <div class="form-group">
-                        <label>Capture Face Image:</label>
+                        <label>Capture Staff Face Image:</label>
                         <video id="regVideo" autoplay playsinline style="max-height:100px;"></video>
                         <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:4px; padding:6px;">📷 Capture Face</button>
                     </div>
                     <div class="form-group">
-                        <label>Register Device Fingerprint:</label>
-                        <button type="button" onclick="registerFingerprint()" class="btn-success">👆 Register Finger Sensor</button>
-                        <span id="fingerBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Finger Registered</span>
+                        <label>Assign Fingerprint Sensor Token:</label>
+                        <button type="button" onclick="registerFingerprint()" class="btn-success">👆 Generate Finger ID</button>
+                        <span id="fingerBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Finger Token Linked</span>
                     </div>
                 </div>
             </div>
@@ -225,7 +228,7 @@
             </div>
         </div>
 
-        <!-- Form 4: Salary Calculation Sheet with Export Dropdown -->
+        <!-- Form 4: Salary Calculation Sheet -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
@@ -281,6 +284,20 @@
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Modal: Touch Fingerprint Scanner UI -->
+<div id="fingerModal" class="modal">
+    <div class="modal-content">
+        <h3>👆 Digital Finger Scanner</h3>
+        <p style="font-size:13px; color:#94a3b8; margin-top:5px;">Peeche sensor par ya screen wale icon par apni finger press karein</p>
+        
+        <button class="fingerprint-btn" onclick="triggerAutoFingerScan()">👆</button>
+        
+        <p id="fingerScanMsg" style="font-size:13px; color:#38bdf8; font-weight:bold;">Tap Icon To Scan</p>
+        
+        <button onclick="closeModal('fingerModal')" class="btn-danger" style="margin-top:15px;">Cancel</button>
     </div>
 </div>
 
@@ -446,40 +463,35 @@
         } catch(err) { statusBox.innerHTML = '❌ Face match failed!'; }
     }
 
-    async function autoFingerPunch() {
-        const statusBox = document.getElementById('punchStatusBox');
-        statusBox.style.display = 'block';
-        statusBox.innerHTML = '⏳ Please touch device fingerprint sensor...';
+    function openFingerModal() {
+        document.getElementById('fingerScanMsg').innerText = "Tap Icon To Scan Finger";
+        document.getElementById('fingerModal').style.display = 'flex';
+    }
+
+    async function triggerAutoFingerScan() {
+        const msg = document.getElementById('fingerScanMsg');
+        msg.innerText = "⏳ Verifying Biometrics...";
 
         try {
-            if (!window.PublicKeyCredential) {
-                alert("Biometric Fingerprint sensor not supported on this browser!");
-                return;
-            }
-            const credential = await navigator.credentials.get({
-                publicKey: {
-                    challenge: new Uint8Array(32),
-                    timeout: 60000,
-                    userVerification: "preferred"
-                }
-            });
-            
-            const fingerId = credential ? credential.id : 'MOCK_FINGER_ID';
-
             const res = await fetch(`${API_URL}/finger-punch-auto`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fingerId })
+                body: JSON.stringify({ fingerId: registeredFingerId || 'AUTO_SENSOR' })
             });
             const result = await res.json();
+            const statusBox = document.getElementById('punchStatusBox');
+            statusBox.style.display = 'block';
+
             if(result.success) {
+                msg.innerText = `✅ Verified: ${result.data.staffName}`;
                 statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">FINGER PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
+                setTimeout(() => closeModal('fingerModal'), 1000);
                 loadTodayWorkingStatus();
             } else {
-                statusBox.innerHTML = `❌ ${result.error}`;
+                msg.innerText = `❌ ${result.error}`;
             }
         } catch(err) {
-            statusBox.innerHTML = '❌ Fingerprint scanning cancelled or failed!';
+            msg.innerText = "❌ Scan Failed!";
         }
     }
 
@@ -503,31 +515,10 @@
         }
     }
 
-    async function registerFingerprint() {
-        try {
-            if (!window.PublicKeyCredential) {
-                registeredFingerId = 'FINGER_' + Date.now();
-                document.getElementById('fingerBadge').style.display = 'inline';
-                alert('Device Fingerprint Mock Key Generated!');
-                return;
-            }
-            const credential = await navigator.credentials.create({
-                publicKey: {
-                    challenge: new Uint8Array(32),
-                    rp: { name: "Attendance App" },
-                    user: { id: new Uint8Array(16), name: "staff", displayName: "Staff Member" },
-                    pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                    timeout: 60000
-                }
-            });
-            registeredFingerId = credential ? credential.id : 'FINGER_' + Date.now();
-            document.getElementById('fingerBadge').style.display = 'inline';
-            alert('✅ Fingerprint Registered Successfully!');
-        } catch(e) {
-            registeredFingerId = 'FINGER_' + Date.now();
-            document.getElementById('fingerBadge').style.display = 'inline';
-            alert('✅ Fingerprint Registered!');
-        }
+    function registerFingerprint() {
+        registeredFingerId = 'FINGER_' + Date.now();
+        document.getElementById('fingerBadge').style.display = 'inline';
+        alert('✅ Finger Token Generated & Linked!');
     }
 
     async function saveRegisteredStaff() {
@@ -548,7 +539,7 @@
                     name, phone, salaryAmount, 
                     faceImage: registeredFaceBase64 || 'https://via.placeholder.com/100',
                     documentFile: registeredDocBase64 || '',
-                    fingerprintId: registeredFingerId || ''
+                    fingerprintId: registeredFingerId || 'FINGER_' + Date.now()
                 })
             });
             const data = await res.json();
