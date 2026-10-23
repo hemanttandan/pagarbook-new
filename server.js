@@ -12,13 +12,11 @@ app.use(cors());
 app.use(express.static(__dirname));
 
 const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir);
-}
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const excelFilePath = path.join(uploadsDir, 'Staff_Attendance_Ledger.csv');
 if (!fs.existsSync(excelFilePath)) {
-    fs.writeFileSync(excelFilePath, 'Type,StaffName,Phone,Date,Status,SalaryAmount,DriveExcelFolder,DriveImageFolder\n');
+    fs.writeFileSync(excelFilePath, 'Type,StaffName,Phone,Date,PunchIn,PunchOut,WorkHours,Status\n');
 }
 
 // Database Connection
@@ -30,8 +28,8 @@ mongoose.connect(process.env.MONGO_URI)
 const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
-  salaryType: { type: String, enum: ['monthly', 'daily'], default: 'monthly' },
   salaryAmount: { type: Number, required: true },
+  registeredFace: { type: String },
   joiningDate: { type: Date, default: Date.now }
 });
 const Staff = mongoose.model('Staff', staffSchema);
@@ -39,177 +37,171 @@ const Staff = mongoose.model('Staff', staffSchema);
 const attendanceSchema = new mongoose.Schema({
   staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: true },
   date: { type: String, required: true },
-  status: { type: String, enum: ['present', 'absent', 'half_day'], required: true },
-  punchTime: { type: String },
+  punchIn: { type: String },
+  punchOut: { type: String },
+  workHours: { type: Number, default: 0 },
+  status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'present' },
   imagePath: { type: String }
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Helper Function: Append to CSV Ledger
 function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
 }
 
+// Helper: Calculate Hours
+function calculateHours(time1, time2) {
+    if(!time1 || !time2) return 0;
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    const diffMs = (new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1));
+    return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
+}
+
 // ---------------- API ENDPOINTS ----------------
 
-// 1. Add Staff API
+// Register Staff with Face
 app.post('/api/staff', async (req, res) => {
   try {
-    const staff = new Staff(req.body);
+    const { name, phone, salaryAmount, faceImage } = req.body;
+    const staff = new Staff({ name, phone, salaryAmount, registeredFace: faceImage });
     await staff.save();
-
-    const todayDate = new Date().toISOString().split('T')[0];
-    appendToExcelLedger(`STAFF_REGISTER,${staff.name},${staff.phone},${todayDate},ACTIVE,${staff.salaryAmount},N/A,N/A`);
-
-    res.status(201).json({ success: true, message: 'Staff added successfully!', data: staff });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
+    res.status(201).json({ success: true, data: staff });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// 2. Fetch All Staff API
+// Fetch All Staff
 app.get('/api/staff', async (req, res) => {
   try {
     const staffList = await Staff.find();
     res.json({ success: true, data: staffList });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 3. Edit Staff API
-app.put('/api/staff/:id', async (req, res) => {
-  try {
-    const staff = await Staff.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json({ success: true, data: staff });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// 4. Delete Staff API
+// Delete Staff
 app.delete('/api/staff/:id', async (req, res) => {
   try {
     await Staff.findByIdAndDelete(req.params.id);
     await Attendance.deleteMany({ staffId: req.params.id });
-    res.json({ success: true, message: 'Staff and attendance deleted!' });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
+    res.json({ success: true });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// 5. Face Punch API
+// Face Punch IN / OUT Logic
 app.post('/api/face-punch', async (req, res) => {
-  const { staffId, image } = req.body;
+  const { staffId } = req.body;
   try {
     const staff = await Staff.findById(staffId);
     if (!staff) return res.status(404).json({ success: false, error: 'Staff not found' });
 
     const today = new Date().toISOString().split('T')[0];
-    const timeNow = new Date().toLocaleTimeString();
+    const now = new Date();
+    const timeNow = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    let savedImagePath = '';
-    if (image) {
-      const base64Data = image.replace(/^data:image\/png;base64,/, "");
-      const fileName = `LENS_${staff.name.replace(/\s+/g, '_')}_${today}_${Date.now()}.png`;
-      savedImagePath = path.join(uploadsDir, fileName);
-      fs.writeFileSync(savedImagePath, base64Data, 'base64');
+    let record = await Attendance.findOne({ staffId, date: today });
+    let punchType = 'IN';
+
+    if (!record) {
+      // First Punch = IN
+      record = new Attendance({ staffId, date: today, punchIn: timeNow, status: 'present' });
+      await record.save();
+      appendToExcelLedger(`IN,${staff.name},${staff.phone},${today},${timeNow},N/A,0,PRESENT`);
+    } else if (!record.punchOut) {
+      // Second Punch = OUT
+      punchType = 'OUT';
+      record.punchOut = timeNow;
+      record.workHours = calculateHours(record.punchIn, timeNow);
+
+      if(record.workHours < 5) record.status = 'half_day';
+      else record.status = 'present';
+
+      await record.save();
+      appendToExcelLedger(`OUT,${staff.name},${staff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
+    } else {
+      return res.status(400).json({ success: false, error: 'IN & OUT punches already completed today!' });
     }
 
-    const attendance = await Attendance.findOneAndUpdate(
-      { staffId, date: today },
-      { status: 'present', punchTime: timeNow, imagePath: savedImagePath },
-      { upsert: true, new: true }
-    );
-
-    appendToExcelLedger(`FACE_PUNCH_LOG,${staff.name},${staff.phone},${today},PRESENT,${staff.salaryAmount},N/A,${savedImagePath}`);
-
-    res.json({ success: true, message: 'Face punch attendance recorded!', data: attendance });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
+    res.json({
+      success: true,
+      data: { staffName: staff.name, type: punchType, time: timeNow, workHours: record.workHours }
+    });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// 6. Manual Attendance Override API (Absent, Present, Half Day)
+// Manual Attendance Override
 app.post('/api/attendance/manual', async (req, res) => {
   const { staffId, date, status } = req.body;
   try {
+    const hours = status === 'present' ? 8 : (status === 'half_day' ? 4 : 0);
     const attendance = await Attendance.findOneAndUpdate(
       { staffId, date },
-      { status, punchTime: 'Manual Entry' },
+      { status, workHours: hours, punchIn: 'Manual', punchOut: 'Manual' },
       { upsert: true, new: true }
     );
     res.json({ success: true, data: attendance });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// 7. Get Today's Working Staff Status
+// Today's Working Status
 app.get('/api/attendance/today', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const logs = await Attendance.find({ date: today }).populate('staffId');
     res.json({ success: true, data: logs });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 8. Get All Attendance Logs
+// All Attendance Logs
 app.get('/api/attendance/all', async (req, res) => {
   try {
     const logs = await Attendance.find().populate('staffId').sort({ date: -1 });
     res.json({ success: true, data: logs });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 9. Monthly Salary Calculation API
-app.get('/api/salary/calculate', async (req, res) => {
-  const { staffId, month, year } = req.query;
+// Monthly Salary Calculation Report API
+app.get('/api/salary/monthly-report', async (req, res) => {
+  const { month, year } = req.query;
   try {
-    const staff = await Staff.findById(staffId);
-    if (!staff) return res.status(404).json({ success: false, error: 'Staff not found' });
-
+    const staffList = await Staff.find();
     const startDate = `${year}-${month.padStart(2, '0')}-01`;
     const endDate = `${year}-${month.padStart(2, '0')}-31`;
 
-    const attendances = await Attendance.find({
-      staffId,
-      date: { $gte: startDate, $lte: endDate }
-    });
+    const report = [];
 
-    let presentDays = 0;
-    let halfDays = 0;
+    for (let staff of staffList) {
+      const logs = await Attendance.find({
+        staffId: staff._id,
+        date: { $gte: startDate, $lte: endDate }
+      });
 
-    attendances.forEach(att => {
-      if (att.status === 'present') presentDays += 1;
-      if (att.status === 'half_day') halfDays += 1;
-    });
+      let shiftCompletedDays = 0;
+      let halfDays = 0;
 
-    const totalEffectiveDays = presentDays + (halfDays * 0.5);
-    const dailyRate = staff.salaryAmount / 30;
-    const totalEarnedSalary = Math.round(totalEffectiveDays * dailyRate);
+      logs.forEach(log => {
+        if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
+        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
+      });
 
-    res.json({
-      success: true,
-      data: {
+      const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
+      const dailyRate = staff.salaryAmount / 30;
+      const netPayableSalary = Math.round(totalEffectiveDays * dailyRate);
+
+      report.push({
         staffName: staff.name,
         monthlyBaseSalary: staff.salaryAmount,
-        presentDays,
+        shiftCompletedDays,
         halfDays,
         totalEffectiveDays,
-        totalEarnedSalary
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+        netPayableSalary
+      });
+    }
+
+    res.json({ success: true, data: report });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 10. CSV Export Endpoint
+// Export CSV
 app.get('/api/export/csv', (req, res) => {
   res.download(excelFilePath, 'Staff_Attendance_Ledger.csv');
 });
@@ -220,6 +212,4 @@ app.get(/.*/, (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 PagarBook Lens Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

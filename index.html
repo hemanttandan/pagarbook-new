@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PagarBook Lens - Dual Dashboard System</title>
+    <title>Attendance App</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 900px; margin: auto; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; }
+        
+        /* Layout Structure with Sidebar */
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: #1e293b; padding: 20px; border-right: 1px solid #334155; display: flex; flex-direction: column; gap: 15px; }
+        .main-content { flex: 1; padding: 20px; overflow-y: auto; }
+        
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
         h1, h2, h3 { margin: 0; color: #38bdf8; }
-        .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .nav-btn:hover { background: #0369a1; }
+        
+        .nav-item { background: #334155; color: #f8fafc; border: none; padding: 12px 15px; border-radius: 8px; font-weight: 600; text-align: left; cursor: pointer; transition: 0.3s; width: 100%; display: flex; align-items: center; gap: 10px; }
+        .nav-item:hover, .nav-item.active { background: #0284c7; color: #fff; }
+        .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        
         .section { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        @media(max-width: 900px) { .app-container { flex-direction: column; } .sidebar { width: 100%; } .grid-2 { grid-template-columns: 1fr; } }
         
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; color: #94a3b8; font-size: 14px; }
@@ -25,346 +33,382 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        video { width: 100%; max-height: 240px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; }
+        video { width: 100%; max-height: 220px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; }
         th { background: #0f172a; color: #38bdf8; }
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
         .bg-present { background: #065f46; color: #34d399; }
-        .bg-absent { background: #991b1b; color: #fca5a5; }
+        .bg-completed { background: #0284c7; color: #e0f2fe; }
         .bg-halfday { background: #92400e; color: #fcd34d; }
+        .bg-absent { background: #991b1b; color: #fca5a5; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; }
         
+        .punch-overlay { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
+
         @media print {
+            .sidebar, .no-print, header { display: none !important; }
             body { background: #fff; color: #000; }
-            .no-print { display: none !important; }
             table, th, td { border: 1px solid #000; }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header class="no-print">
-        <div>
-            <h1>📷 PagarBook Lens</h1>
-            <small style="color:#94a3b8;">Attendance & Payroll Management</small>
-        </div>
-        <div>
-            <button class="nav-btn" id="toggleViewBtn" onclick="toggleView()">🔑 Admin Dashboard Login</button>
-        </div>
-    </header>
+<div class="app-container">
+    <!-- Left Navigation Sidebar -->
+    <div class="sidebar no-print">
+        <h2 style="font-size: 20px;">📱 Attendance App</h2>
+        <small style="color: #94a3b8;">System Control Panel</small>
+        <hr style="border: 0.5px solid #334155; width: 100%;">
 
-    <!-- ================= 1. STAFF KIOSK / SCAN DASHBOARD ================= -->
-    <div id="staffKioskSection">
-        <div class="grid-2">
-            <!-- Lens Camera Scanner -->
-            <div class="section">
-                <h3>📸 Face Scan Punch</h3>
-                <p style="font-size:12px; color:#94a3b8;">Select your name & scan face to mark attendance</p>
-                <video id="video" autoplay playsinline></video>
-                <div class="form-group" style="margin-top: 10px;">
-                    <label>Select Staff Member:</label>
-                    <select id="faceStaffSelect"><option>Loading staff...</option></select>
+        <button class="nav-item active" onclick="switchTab('kioskTab')">📸 Staff Face Kiosk</button>
+        <button class="nav-item" onclick="handleAdminTabClick('staffTab')">👥 Staff Management</button>
+        <button class="nav-item" onclick="handleAdminTabClick('attendanceTab')">📋 Attendance Logs</button>
+        <button class="nav-item" onclick="handleAdminTabClick('salaryTab')">💰 Salary Sheet</button>
+
+        <div style="margin-top: auto;">
+            <button class="btn-danger" id="authBtn" onclick="toggleAdminAuth()">🔑 Admin Login</button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <header class="no-print">
+            <h2 id="tabTitle">Staff Attendance Terminal</h2>
+            <div id="statusBadge" style="font-size: 13px; color: #10b981; font-weight: bold;">● System Active</div>
+        </header>
+
+        <!-- 1. STAFF KIOSK SECTION -->
+        <div id="kioskTab" class="tab-content">
+            <div class="grid-2">
+                <div class="section">
+                    <h3>📸 Auto Face Scan Punch</h3>
+                    <p style="font-size: 12px; color: #94a3b8;">Select staff & look at camera for auto/manual punch</p>
+                    <video id="kioskVideo" autoplay playsinline></video>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>Select Staff Member:</label>
+                        <select id="kioskStaffSelect"><option>Loading staff...</option></select>
+                    </div>
+                    <button onclick="triggerFacePunch()" class="btn-success">📸 Punch IN / OUT</button>
+                    <div id="punchStatusDisplay" class="punch-overlay" style="display: none;"></div>
+                    <canvas id="kioskCanvas" style="display:none;"></canvas>
                 </div>
-                <button onclick="scanAndPunchFace()" class="btn-success">📸 Capture & Punch Attendance</button>
-                <canvas id="canvas" style="display:none;"></canvas>
-            </div>
 
-            <!-- Working Staff Live Status -->
+                <div class="section">
+                    <h3>🟢 Working Staff Status (Today)</h3>
+                    <div style="max-height: 350px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Staff Name</th>
+                                    <th>IN Time</th>
+                                    <th>OUT Time</th>
+                                    <th>Status / Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody id="todayStatusTable">
+                                <tr><td colspan="4">Loading working status...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. ADMIN: STAFF MANAGEMENT -->
+        <div id="staffTab" class="tab-content" style="display: none;">
+            <div class="grid-2">
+                <div class="section">
+                    <h3>➕ Register New Staff with Face</h3>
+                    <div class="form-group">
+                        <label>Full Name:</label>
+                        <input type="text" id="regName" placeholder="Enter staff name">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number:</label>
+                        <input type="text" id="regPhone" placeholder="Enter phone number">
+                    </div>
+                    <div class="form-group">
+                        <label>Salary Amount (₹):</label>
+                        <input type="number" id="regSalary" placeholder="Enter monthly salary">
+                    </div>
+                    <div class="form-group">
+                        <label>Face Registration Capture:</label>
+                        <video id="regVideo" autoplay playsinline></video>
+                        <button type="button" onclick="captureRegFace()" class="btn-warning" style="margin-top: 5px;">📷 Capture Face Template</button>
+                        <small id="regFaceBadge" style="color:#10b981; display:none;">✅ Face Template Captured!</small>
+                    </div>
+                    <button onclick="registerStaffWithFace()" class="btn-success">Save Registered Staff</button>
+                </div>
+
+                <div class="section">
+                    <h3>👥 Registered Staff Directory</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Salary</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminStaffTable">
+                                <tr><td colspan="4">Loading staff directory...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ADMIN: ATTENDANCE LOGS -->
+        <div id="attendanceTab" class="tab-content" style="display: none;">
             <div class="section">
-                <h3>🟢 Working Staff Status (Today)</h3>
-                <p style="font-size:12px; color:#94a3b8;">Real-time staff check-in logs</p>
-                <div style="max-height: 320px; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>📋 Detailed Attendance Ledger</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="exportToCSV()" class="btn-warning" style="width: auto;">📥 Export CSV</button>
+                        <button onclick="openManualModal()" class="btn-success" style="width: auto;">✏️ Edit / Manual Entry</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Staff Name</th>
+                                <th>Punch IN</th>
+                                <th>Punch OUT</th>
+                                <th>Total Hours</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fullAttendanceTable">
+                            <tr><td colspan="6">Loading logs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. ADMIN: SALARY SHEET -->
+        <div id="salaryTab" class="tab-content" style="display: none;">
+            <div class="section">
+                <h3>💰 Monthly Salary & Attendance Calculation</h3>
+                <div class="grid-2" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Select Month:</label>
+                        <select id="salMonth">
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10" selected>October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Year:</label>
+                        <select id="salYear">
+                            <option value="2025">2025</option>
+                            <option value="2026" selected>2026</option>
+                            <option value="2027">2027</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="calculateAllSalaries()" class="btn-success" style="margin-bottom: 15px;">⚡ Calculate Monthly Salaries</button>
+                <button onclick="window.print()" class="btn-warning no-print" style="margin-bottom: 15px;">🖨️ Print Salary Report</button>
+                
+                <div style="overflow-x: auto;">
                     <table>
                         <thead>
                             <tr>
                                 <th>Staff Name</th>
-                                <th>Punch Time</th>
-                                <th>Status</th>
+                                <th>Base Monthly Salary</th>
+                                <th>Shift Completed (Days)</th>
+                                <th>Half Days</th>
+                                <th>Effective Working Days</th>
+                                <th>Net Payable Salary</th>
                             </tr>
                         </thead>
-                        <tbody id="todayWorkingTable">
-                            <tr><td colspan="3" style="text-align:center;">Loading status...</td></tr>
+                        <tbody id="salaryReportTable">
+                            <tr><td colspan="6">Select month/year and click calculate.</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- ================= 2. ADMIN DASHBOARD ================= -->
-    <div id="adminSection" style="display: none;">
-        <div class="section no-print" style="background:#0f172a; border-left:4px solid #38bdf8;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>🔐 Admin Control Panel</h3>
-                <button onclick="logoutAdmin()" class="btn-danger" style="width:auto; padding:6px 12px; font-size:12px;">Logout</button>
-            </div>
-        </div>
-
-        <div class="grid-2 no-print">
-            <!-- Add New Staff -->
-            <div class="section">
-                <h3>➕ Register New Staff</h3>
-                <div class="form-group">
-                    <label>Staff Full Name:</label>
-                    <input type="text" id="addName" placeholder="Enter full name">
-                </div>
-                <div class="form-group">
-                    <label>Phone Number:</label>
-                    <input type="text" id="addPhone" placeholder="Enter phone number">
-                </div>
-                <div class="form-group">
-                    <label>Salary Type:</label>
-                    <select id="addSalaryType">
-                        <option value="monthly">Monthly</option>
-                        <option value="daily">Daily</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Salary Amount (₹):</label>
-                    <input type="number" id="addSalaryAmount" placeholder="Enter salary">
-                </div>
-                <button onclick="addNewStaff()" class="btn-success">Save Staff Master</button>
-            </div>
-
-            <!-- Export Tools & Report Filters -->
-            <div class="section">
-                <h3>📊 Export & Salary Sheet</h3>
-                <div class="form-group">
-                    <label>Select Month & Year:</label>
-                    <div style="display:flex; gap:10px;">
-                        <input type="number" id="filterMonth" placeholder="MM (e.g. 10)" value="10">
-                        <input type="number" id="filterYear" placeholder="YYYY (e.g. 2026)" value="2026">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Quick Export Actions:</label>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <button onclick="exportToCSV()" class="btn-warning">📥 Download Excel CSV</button>
-                        <button onclick="window.print()" class="btn-success">🖨️ Print / PDF Export</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Staff Master Management Table -->
-        <div class="section">
-            <h3>👥 Staff Master Directory</h3>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Salary Details</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminStaffTable">
-                        <tr><td colspan="4">Loading staff data...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Attendance Sheet & Manual Edit Section -->
-        <div class="section">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Attendance Log & Manual Override</h3>
-                <button onclick="openManualAttendanceModal()" class="btn-warning no-print" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Manual Entry / Edit</button>
-            </div>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Staff Name</th>
-                            <th>Punch Time</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminAttendanceTable">
-                        <tr><td colspan="4">Loading logs...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 </div>
 
-<!-- Password Modal -->
+<!-- Modal: Admin PIN Login -->
 <div id="loginModal" class="modal">
     <div class="modal-content">
-        <h3 style="margin-bottom: 15px;">🔒 Admin Security Access</h3>
-        <div class="form-group">
-            <label>Enter Admin Password PIN:</label>
-            <input type="password" id="adminPasswordInput" placeholder="Enter PIN (Default: 1234)">
+        <h3>🔒 Admin Security Verification</h3>
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Enter Admin PIN Password:</label>
+            <input type="password" id="adminPinInput" placeholder="Enter PIN (Default: 1234)">
         </div>
-        <button onclick="verifyAdminLogin()" class="btn-success">Unlock Admin Panel</button>
-        <button onclick="closeModal()" class="btn-danger" style="margin-top:8px;">Cancel</button>
+        <button onclick="verifyAdminPin()" class="btn-success">Unlock Admin Panel</button>
+        <button onclick="closeModal('loginModal')" class="btn-danger" style="margin-top: 8px;">Cancel</button>
     </div>
 </div>
 
-<!-- Edit Staff Modal -->
-<div id="editStaffModal" class="modal">
+<!-- Modal: Manual Attendance Entry -->
+<div id="manualModal" class="modal">
     <div class="modal-content">
-        <h3 style="margin-bottom:15px;">✏️ Edit Staff Details</h3>
-        <input type="hidden" id="editStaffId">
-        <div class="form-group">
-            <label>Full Name:</label>
-            <input type="text" id="editName">
-        </div>
-        <div class="form-group">
-            <label>Phone Number:</label>
-            <input type="text" id="editPhone">
-        </div>
-        <div class="form-group">
-            <label>Salary Amount (₹):</label>
-            <input type="number" id="editSalaryAmount">
-        </div>
-        <button onclick="saveStaffEdit()" class="btn-success">Update Staff Details</button>
-        <button onclick="closeEditModal()" class="btn-danger" style="margin-top:8px;">Cancel</button>
-    </div>
-</div>
-
-<!-- Manual Attendance Modal -->
-<div id="manualAttendanceModal" class="modal">
-    <div class="modal-content">
-        <h3 style="margin-bottom:15px;">📝 Edit / Mark Attendance</h3>
-        <div class="form-group">
+        <h3>📝 Manual Attendance Override</h3>
+        <div class="form-group" style="margin-top: 10px;">
             <label>Select Staff:</label>
             <select id="manualStaffSelect"><option>Loading...</option></select>
         </div>
         <div class="form-group">
-            <label>Date (YYYY-MM-DD):</label>
+            <label>Date:</label>
             <input type="date" id="manualDate">
         </div>
         <div class="form-group">
             <label>Status:</label>
             <select id="manualStatus">
-                <option value="present">Present</option>
-                <option value="absent">Absent</option>
+                <option value="present">Present (Shift Completed)</option>
                 <option value="half_day">Half Day</option>
+                <option value="absent">Absent</option>
             </select>
         </div>
-        <button onclick="submitManualAttendance()" class="btn-success">Save Attendance Status</button>
-        <button onclick="closeManualModal()" class="btn-danger" style="margin-top:8px;">Cancel</button>
+        <button onclick="saveManualAttendance()" class="btn-success">Save Record</button>
+        <button onclick="closeModal('manualModal')" class="btn-danger" style="margin-top: 8px;">Cancel</button>
     </div>
 </div>
 
 <script>
     const API_URL = '/api';
-    let isAdminLoggedIn = false;
-    let cachedStaffList = [];
+    let isAdmin = false;
+    let registeredFaceBase64 = '';
+    let staffDataCache = [];
 
-    // Init Camera
-    const video = document.getElementById('video');
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { console.warn("Camera permission needed!"); });
+    // Camera Handlers
+    const kioskVideo = document.getElementById('kioskVideo');
+    const regVideo = document.getElementById('regVideo');
+
+    function startCameras() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                .then(stream => {
+                    kioskVideo.srcObject = stream;
+                    regVideo.srcObject = stream;
+                })
+                .catch(err => console.warn("Camera permission required!"));
+        }
     }
 
-    // Toggle View (Staff Kiosk vs Admin)
-    function toggleView() {
-        if(isAdminLoggedIn) {
-            document.getElementById('staffKioskSection').style.display = 'none';
-            document.getElementById('adminSection').style.display = 'block';
-            document.getElementById('toggleViewBtn').innerText = '📱 Switch to Staff Kiosk';
-            loadAdminData();
+    // Tab Navigation
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(tabId).style.display = 'block';
+        
+        if(tabId === 'kioskTab') loadKioskData();
+        if(tabId === 'staffTab') loadStaffMaster();
+        if(tabId === 'attendanceTab') loadFullAttendance();
+    }
+
+    function handleAdminTabClick(tabId) {
+        if(isAdmin) {
+            switchTab(tabId);
         } else {
             document.getElementById('loginModal').style.display = 'flex';
         }
     }
 
-    function closeModal() { document.getElementById('loginModal').style.display = 'none'; }
-    function closeEditModal() { document.getElementById('editStaffModal').style.display = 'none'; }
-    function closeManualModal() { document.getElementById('manualAttendanceModal').style.display = 'none'; }
+    function verifyAdminPin() {
+        const pin = document.getElementById('adminPinInput').value;
+        if(pin === '1234') {
+            isAdmin = true;
+            document.getElementById('authBtn').innerText = '🔒 Admin Logout';
+            document.getElementById('authBtn').className = 'btn-warning';
+            closeModal('loginModal');
+            switchTab('staffTab');
+        } else { alert('❌ Incorrect Admin PIN!'); }
+    }
 
-    function verifyAdminLogin() {
-        const pin = document.getElementById('adminPasswordInput').value;
-        if(pin === '1234') { // Default PIN
-            isAdminLoggedIn = true;
-            closeModal();
-            toggleView();
+    function toggleAdminAuth() {
+        if(isAdmin) {
+            isAdmin = false;
+            document.getElementById('authBtn').innerText = '🔑 Admin Login';
+            document.getElementById('authBtn').className = 'btn-danger';
+            switchTab('kioskTab');
         } else {
-            alert('❌ Incorrect Password PIN!');
+            document.getElementById('loginModal').style.display = 'flex';
         }
     }
 
-    function logoutAdmin() {
-        isAdminLoggedIn = false;
-        document.getElementById('adminSection').style.display = 'none';
-        document.getElementById('staffKioskSection').style.display = 'block';
-        document.getElementById('toggleViewBtn').innerText = '🔑 Admin Dashboard Login';
-    }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // Load Staff Master for Kiosk & Dropdowns
-    async function loadStaffList() {
-        const selectDropdown = document.getElementById('faceStaffSelect');
-        const manualSelect = document.getElementById('manualStaffSelect');
-
+    // Load Staff Options
+    async function loadKioskData() {
+        const select = document.getElementById('kioskStaffSelect');
         try {
             const res = await fetch(`${API_URL}/staff`);
             const result = await res.json();
-
-            if(result.success && result.data) {
-                cachedStaffList = result.data;
-                selectDropdown.innerHTML = '';
-                manualSelect.innerHTML = '';
-
+            if(result.success) {
+                staffDataCache = result.data;
+                select.innerHTML = '';
                 result.data.forEach(staff => {
-                    selectDropdown.innerHTML += `<option value="${staff._id}">${staff.name} (${staff.phone})</option>`;
-                    manualSelect.innerHTML += `<option value="${staff._id}">${staff.name}</option>`;
+                    select.innerHTML += `<option value="${staff._id}">${staff.name} (${staff.phone})</option>`;
                 });
-                renderAdminStaffTable();
             }
-        } catch (err) {
-            console.error('Error fetching staff list:', err);
-        }
+        } catch(err) { console.error(err); }
+        loadTodayStatus();
     }
 
-    // Load Today's Working Staff Status
-    async function loadTodayWorkingStatus() {
-        const tableBody = document.getElementById('todayWorkingTable');
+    // Load Today's Status Table
+    async function loadTodayStatus() {
+        const tbody = document.getElementById('todayStatusTable');
         try {
             const res = await fetch(`${API_URL}/attendance/today`);
             const result = await res.json();
-
-            if(!result.data || result.data.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No check-ins today yet.</td></tr>';
+            if(!result.data || !result.data.length) {
+                tbody.innerHTML = '<tr><td colspan="4">No check-ins today.</td></tr>';
                 return;
             }
+            tbody.innerHTML = '';
+            result.data.forEach(row => {
+                let statusLabel = row.status.toUpperCase();
+                let badgeClass = 'bg-present';
+                if(row.workHours >= 8) { statusLabel = 'SHIFT COMPLETED'; badgeClass = 'bg-completed'; }
+                else if(row.workHours > 0 && row.workHours < 5) { statusLabel = 'HALF DAY'; badgeClass = 'bg-halfday'; }
 
-            tableBody.innerHTML = '';
-            result.data.forEach(log => {
-                tableBody.innerHTML += `
+                tbody.innerHTML += `
                     <tr>
-                        <td><strong>${log.staffId ? log.staffId.name : 'Staff'}</strong></td>
-                        <td>${log.punchTime || 'N/A'}</td>
-                        <td><span class="badge bg-${log.status}">${log.status.toUpperCase()}</span></td>
+                        <td><strong>${row.staffId ? row.staffId.name : 'Staff'}</strong></td>
+                        <td>${row.punchIn || 'N/A'}</td>
+                        <td>${row.punchOut || 'Working...'}</td>
+                        <td><span class="badge ${badgeClass}">${statusLabel} (${row.workHours || 0} hrs)</span></td>
                     </tr>
                 `;
             });
-        } catch (err) {
-            tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#ef4444;">Error loading working status!</td></tr>';
-        }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="4">Error loading data.</td></tr>'; }
     }
 
-    // Face Scan & Punch
-    async function scanAndPunchFace() {
-        const staffId = document.getElementById('faceStaffSelect').value;
+    // Trigger Face Punch (IN / OUT Auto Logic)
+    async function triggerFacePunch() {
+        const staffId = document.getElementById('kioskStaffSelect').value;
         if(!staffId) { alert('Select a staff member!'); return; }
 
-        const canvas = document.getElementById('canvas');
-        canvas.width = video.videoWidth || 320;
-        canvas.height = video.videoHeight || 240;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+        const canvas = document.getElementById('kioskCanvas');
+        canvas.width = kioskVideo.videoWidth || 320;
+        canvas.height = kioskVideo.videoHeight || 240;
+        canvas.getContext('2d').drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
         const imageBase64 = canvas.toDataURL('image/png');
 
         try {
@@ -375,198 +419,159 @@
             });
 
             const result = await res.json();
+            const display = document.getElementById('punchStatusDisplay');
+            display.style.display = 'block';
+
             if(result.success) {
-                alert('✅ Attendance Recorded Successfully!');
-                loadTodayWorkingStatus();
+                display.innerHTML = `✅ ${result.data.staffName}<br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
+                loadTodayStatus();
             } else {
-                alert('Punch Failed: ' + result.error);
+                display.innerHTML = `❌ ${result.error}`;
             }
-        } catch (err) {
-            alert('Error recording face punch!');
-        }
+        } catch(err) { alert('Punch request failed!'); }
     }
 
-    // Add Staff Function
-    async function addNewStaff() {
-        const name = document.getElementById('addName').value;
-        const phone = document.getElementById('addPhone').value;
-        const salaryType = document.getElementById('addSalaryType').value;
-        const salaryAmount = document.getElementById('addSalaryAmount').value;
+    // Capture Face for Registration
+    function captureRegFace() {
+        const canvas = document.createElement('canvas');
+        canvas.width = regVideo.videoWidth || 320;
+        canvas.height = regVideo.videoHeight || 240;
+        canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
+        registeredFaceBase64 = canvas.toDataURL('image/png');
+        document.getElementById('regFaceBadge').style.display = 'block';
+    }
 
-        if(!name || !phone || !salaryAmount) { alert('Fill all fields!'); return; }
+    // Register Staff
+    async function registerStaffWithFace() {
+        const name = document.getElementById('regName').value;
+        const phone = document.getElementById('regPhone').value;
+        const salaryAmount = document.getElementById('regSalary').value;
+
+        if(!name || !phone || !salaryAmount) { alert('Fill all required fields!'); return; }
 
         try {
             const res = await fetch(`${API_URL}/staff`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, phone, salaryType, salaryAmount })
+                body: JSON.stringify({ name, phone, salaryAmount, faceImage: registeredFaceBase64 })
             });
-            const data = await res.json();
-            if(data.success) {
+            const result = await res.json();
+            if(result.success) {
                 alert('Staff Registered Successfully!');
-                document.getElementById('addName').value = '';
-                document.getElementById('addPhone').value = '';
-                document.getElementById('addSalaryAmount').value = '';
-                loadStaffList();
-            } else { alert('Error: ' + data.error); }
-        } catch (err) { alert('Server error while adding staff!'); }
+                document.getElementById('regName').value = '';
+                document.getElementById('regPhone').value = '';
+                document.getElementById('regSalary').value = '';
+                registeredFaceBase64 = '';
+                document.getElementById('regFaceBadge').style.display = 'none';
+                loadStaffMaster();
+            } else { alert('Error: ' + result.error); }
+        } catch(err) { alert('Registration failed!'); }
     }
 
-    // Render Admin Tables
-    function renderAdminStaffTable() {
+    // Load Staff Directory
+    async function loadStaffMaster() {
         const tbody = document.getElementById('adminStaffTable');
-        if(!cachedStaffList.length) {
-            tbody.innerHTML = '<tr><td colspan="4">No staff registered.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = '';
-        cachedStaffList.forEach(staff => {
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${staff.name}</strong></td>
-                    <td>${staff.phone}</td>
-                    <td>₹${staff.salaryAmount} (${staff.salaryType})</td>
-                    <td>
-                        <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount})" class="btn-warning" style="width:auto; padding:4px 8px; font-size:12px;">Edit</button>
-                        <button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="width:auto; padding:4px 8px; font-size:12px;">Delete</button>
-                        <button onclick="viewSalarySheet('${staff._id}')" class="btn-success" style="width:auto; padding:4px 8px; font-size:12px;">Salary</button>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-
-    // Edit Staff
-    function openEditStaff(id, name, phone, salary) {
-        document.getElementById('editStaffId').value = id;
-        document.getElementById('editName').value = name;
-        document.getElementById('editPhone').value = phone;
-        document.getElementById('editSalaryAmount').value = salary;
-        document.getElementById('editStaffModal').style.display = 'flex';
-    }
-
-    async function saveStaffEdit() {
-        const id = document.getElementById('editStaffId').value;
-        const name = document.getElementById('editName').value;
-        const phone = document.getElementById('editPhone').value;
-        const salaryAmount = document.getElementById('editSalaryAmount').value;
-
         try {
-            const res = await fetch(`${API_URL}/staff/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, phone, salaryAmount })
+            const res = await fetch(`${API_URL}/staff`);
+            const result = await res.json();
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="4">No staff.</td></tr>'; return; }
+            tbody.innerHTML = '';
+            result.data.forEach(staff => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${staff.name}</strong></td>
+                        <td>${staff.phone}</td>
+                        <td>₹${staff.salaryAmount}</td>
+                        <td><button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button></td>
+                    </tr>
+                `;
             });
-            const data = await res.json();
-            if(data.success) {
-                alert('Staff updated successfully!');
-                closeEditModal();
-                loadStaffList();
-            } else { alert('Error updating: ' + data.error); }
-        } catch (err) { alert('Error updating staff!'); }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="4">Error loading.</td></tr>'; }
     }
 
-    // Delete Staff
     async function deleteStaff(id) {
-        if(!confirm('Are you sure you want to delete this staff member?')) return;
+        if(!confirm('Delete this staff member?')) return;
+        await fetch(`${API_URL}/staff/${id}`, { method: 'DELETE' });
+        loadStaffMaster();
+    }
+
+    // Full Attendance
+    async function loadFullAttendance() {
+        const tbody = document.getElementById('fullAttendanceTable');
         try {
-            const res = await fetch(`${API_URL}/staff/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if(data.success) {
-                alert('Staff deleted successfully!');
-                loadStaffList();
-            } else { alert('Error: ' + data.error); }
-        } catch (err) { alert('Error deleting staff!'); }
+            const res = await fetch(`${API_URL}/attendance/all`);
+            const result = await res.json();
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No logs.</td></tr>'; return; }
+            tbody.innerHTML = '';
+            result.data.forEach(row => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${row.date}</td>
+                        <td><strong>${row.staffId ? row.staffId.name : 'N/A'}</strong></td>
+                        <td>${row.punchIn || 'N/A'}</td>
+                        <td>${row.punchOut || 'N/A'}</td>
+                        <td>${row.workHours || 0} hrs</td>
+                        <td><span class="badge bg-present">${row.status.toUpperCase()}</span></td>
+                    </tr>
+                `;
+            });
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading logs.</td></tr>'; }
     }
 
-    // Manual Attendance
-    function openManualAttendanceModal() {
+    // Salary Report
+    async function calculateAllSalaries() {
+        const month = document.getElementById('salMonth').value;
+        const year = document.getElementById('salYear').value;
+        const tbody = document.getElementById('salaryReportTable');
+
+        try {
+            const res = await fetch(`${API_URL}/salary/monthly-report?month=${month}&year=${year}`);
+            const result = await res.json();
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No staff data for calculation.</td></tr>'; return; }
+            
+            tbody.innerHTML = '';
+            result.data.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${item.staffName}</strong></td>
+                        <td>₹${item.monthlyBaseSalary}</td>
+                        <td>${item.shiftCompletedDays} Days</td>
+                        <td>${item.halfDays} Days</td>
+                        <td>${item.totalEffectiveDays} Days</td>
+                        <td style="color:#10b981; font-weight:bold;">₹${item.netPayableSalary}</td>
+                    </tr>
+                `;
+            });
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error calculating salaries.</td></tr>'; }
+    }
+
+    function openManualModal() {
+        const select = document.getElementById('manualStaffSelect');
+        select.innerHTML = '';
+        staffDataCache.forEach(s => select.innerHTML += `<option value="${s._id}">${s.name}</option>`);
         document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
-        document.getElementById('manualAttendanceModal').style.display = 'flex';
+        document.getElementById('manualModal').style.display = 'flex';
     }
 
-    async function submitManualAttendance() {
+    async function saveManualAttendance() {
         const staffId = document.getElementById('manualStaffSelect').value;
         const date = document.getElementById('manualDate').value;
         const status = document.getElementById('manualStatus').value;
 
-        if(!staffId || !date) { alert('Select staff and date!'); return; }
-
-        try {
-            const res = await fetch(`${API_URL}/attendance/manual`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ staffId, date, status })
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert('Attendance record updated/saved!');
-                closeManualModal();
-                loadAdminAttendanceLogs();
-            } else { alert('Error: ' + data.error); }
-        } catch (err) { alert('Error updating attendance!'); }
+        await fetch(`${API_URL}/attendance/manual`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staffId, date, status })
+        });
+        closeModal('manualModal');
+        loadFullAttendance();
     }
 
-    // Load Admin Data
-    async function loadAdminData() {
-        loadStaffList();
-        loadAdminAttendanceLogs();
-    }
+    function exportToCSV() { window.open(`${API_URL}/export/csv`, '_blank'); }
 
-    async function loadAdminAttendanceLogs() {
-        const tbody = document.getElementById('adminAttendanceTable');
-        try {
-            const res = await fetch(`${API_URL}/attendance/all`);
-            const result = await res.json();
-            if(!result.data || !result.data.length) {
-                tbody.innerHTML = '<tr><td colspan="4">No logs found.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = '';
-            result.data.forEach(log => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${log.date}</td>
-                        <td><strong>${log.staffId ? log.staffId.name : 'N/A'}</strong></td>
-                        <td>${log.punchTime || 'Manual Entry'}</td>
-                        <td><span class="badge bg-${log.status}">${log.status.toUpperCase()}</span></td>
-                    </tr>
-                `;
-            });
-        } catch (err) { tbody.innerHTML = '<tr><td colspan="4">Error loading logs!</td></tr>'; }
-    }
-
-    // View Salary Calculation
-    async function viewSalarySheet(staffId) {
-        const month = document.getElementById('filterMonth').value || "10";
-        const year = document.getElementById('filterYear').value || "2026";
-
-        try {
-            const res = await fetch(`${API_URL}/salary/calculate?staffId=${staffId}&month=${month}&year=${year}`);
-            const result = await res.json();
-
-            if(result.success) {
-                const d = result.data;
-                alert(`--- PagarBook Salary Sheet ---
-Staff Name: ${d.staffName}
-Monthly Base Salary: ₹${d.monthlyBaseSalary}
-Total Present Days: ${d.presentDays}
-Half Days: ${d.halfDays}
-Effective Working Days: ${d.totalEffectiveDays}
-Net Payable Earned Salary: ₹${d.totalEarnedSalary}`);
-            } else { alert('Error calculating salary!'); }
-        } catch (err) { alert('Error calculating salary sheet!'); }
-    }
-
-    // Export CSV
-    function exportToCSV() {
-        window.open(`${API_URL}/export/csv`, '_blank');
-    }
-
-    // Page Load Init
-    loadStaffList();
-    loadTodayWorkingStatus();
+    // On Load
+    startCameras();
+    loadKioskData();
 </script>
 
 </body>
