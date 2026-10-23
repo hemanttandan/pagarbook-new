@@ -187,7 +187,6 @@
                 </div>
             </div>
             
-            <!-- Export Dropdown -->
             <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
                 <label style="margin:0; font-weight:bold;">Export Format:</label>
                 <select id="exportFormatSelect" style="width:auto; padding:8px;">
@@ -216,7 +215,7 @@
             </div>
         </div>
 
-        <!-- Form 4: Salary Calculation Sheet (Restored) -->
+        <!-- Form 4: Salary Calculation Sheet -->
         <div class="section printable-report">
             <h3>💰 Monthly Salary Calculation Sheet</h3>
             <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
@@ -378,7 +377,6 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // Auto Face Scan Punch
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
         canvas.width = kioskVideo.videoWidth || 320;

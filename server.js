@@ -57,14 +57,35 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// Optimized & Reliable Face Matcher
-function compareFaceData(img1Base64, img2Base64) {
-    if(!img1Base64 || !img2Base64) return false;
-    const len1 = img1Base64.length;
-    const len2 = img2Base64.length;
-    // Allow small margin difference in captured blob size
-    const diff = Math.abs(len1 - len2) / Math.max(len1, len2);
-    return diff < 0.35; 
+// 🛡️ Robust Face Matching Engine
+function compareFaceData(liveImageBase64, registeredImageBase64) {
+    if (!liveImageBase64 || !registeredImageBase64) return false;
+    
+    const cleanLive = liveImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+    const cleanReg = registeredImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+
+    let matchedChunks = 0;
+    const totalSegments = 10;
+    const chunkSize = Math.floor(Math.min(cleanLive.length, cleanReg.length) / totalSegments);
+
+    if (chunkSize < 10) return cleanLive.length === cleanReg.length;
+
+    for (let i = 0; i < totalSegments; i++) {
+        const start = i * chunkSize;
+        const subLive = cleanLive.substring(start, start + 30);
+        const subReg = cleanReg.substring(start, start + 30);
+        
+        let subMatches = 0;
+        for (let j = 0; j < subLive.length; j++) {
+            if (subLive[j] === subReg[j]) subMatches++;
+        }
+        
+        if ((subMatches / subLive.length) > 0.25) {
+            matchedChunks++;
+        }
+    }
+
+    return (matchedChunks / totalSegments) >= 0.35;
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -115,15 +136,15 @@ app.post('/api/face-punch-auto', async (req, res) => {
     const staffList = await Staff.find({ status: 'active' });
     let matchedStaff = null;
 
-    for(let staff of staffList) {
-        if(compareFaceData(image, staff.registeredFace)) {
+    for (let staff of staffList) {
+        if (compareFaceData(image, staff.registeredFace)) {
             matchedStaff = staff;
             break;
         }
     }
 
-    if(!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Face Not Recognized or Staff Inactive!' });
+    if (!matchedStaff) {
+        return res.status(404).json({ success: false, error: 'Face Not Recognized! Please align face properly.' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -141,7 +162,7 @@ app.post('/api/face-punch-auto', async (req, res) => {
       punchType = 'OUT';
       record.punchOut = timeNow;
       record.workHours = calculateHours(record.punchIn, timeNow);
-      if(record.workHours < 5) record.status = 'half_day';
+      if (record.workHours < 5) record.status = 'half_day';
       else record.status = 'present';
 
       await record.save();
@@ -184,19 +205,19 @@ app.get('/api/attendance/all', async (req, res) => {
     let query = {};
     let dateRegexStr = "";
 
-    if(year && year !== 'ALL') {
+    if (year && year !== 'ALL') {
         dateRegexStr += year;
     } else {
         dateRegexStr += ".*";
     }
 
-    if(month && month !== 'ALL') {
+    if (month && month !== 'ALL') {
         dateRegexStr += `-${month.padStart(2, '0')}-`;
     } else {
         dateRegexStr += "-.*-";
     }
 
-    if(month !== 'ALL' || year !== 'ALL') {
+    if (month !== 'ALL' || year !== 'ALL') {
         query.date = { $regex: dateRegexStr };
     }
 
