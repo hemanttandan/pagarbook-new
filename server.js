@@ -30,6 +30,7 @@ const staffSchema = new mongoose.Schema({
   phone: { type: String, required: true, unique: true },
   salaryAmount: { type: Number, required: true },
   registeredFace: { type: String, required: true },
+  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   joiningDate: { type: Date, default: Date.now }
 });
 const Staff = mongoose.model('Staff', staffSchema);
@@ -56,32 +57,33 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// Strict Face Similarity Verifier (Simple Image Signature Compare)
 function compareFaceData(img1Base64, img2Base64) {
     if(!img1Base64 || !img2Base64) return false;
-    const str1 = img1Base64.substring(100, 300);
-    const str2 = img2Base64.substring(100, 300);
-    let matches = 0;
-    for(let i=0; i<Math.min(str1.length, str2.length); i++) {
-        if(str1[i] === str2[i]) matches++;
-    }
-    const ratio = matches / Math.min(str1.length, str2.length);
-    return ratio > 0.45; // Match confidence
+    const s1A = img1Base64.substring(100, 400);
+    const s2A = img2Base64.substring(100, 400);
+    const s1B = img1Base64.substring(500, 800);
+    const s2B = img2Base64.substring(500, 800);
+
+    let matchA = 0, matchB = 0;
+    for(let i=0; i<s1A.length; i++) { if(s1A[i] === s2A[i]) matchA++; }
+    for(let i=0; i<s1B.length; i++) { if(s1B[i] === s2B[i]) matchB++; }
+
+    const ratioA = matchA / s1A.length;
+    const ratioB = matchB / s1B.length;
+    return (ratioA > 0.40 || ratioB > 0.40);
 }
 
 // ---------------- API ENDPOINTS ----------------
 
-// Register Staff with Face
 app.post('/api/staff', async (req, res) => {
   try {
     const { name, phone, salaryAmount, faceImage } = req.body;
-    const staff = new Staff({ name, phone, salaryAmount, registeredFace: faceImage });
+    const staff = new Staff({ name, phone, salaryAmount, registeredFace: faceImage, status: 'active' });
     await staff.save();
     res.status(201).json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Fetch All Staff
 app.get('/api/staff', async (req, res) => {
   try {
     const staffList = await Staff.find();
@@ -89,7 +91,14 @@ app.get('/api/staff', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Delete Staff
+app.put('/api/staff/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const staff = await Staff.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json({ success: true, data: staff });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
 app.delete('/api/staff/:id', async (req, res) => {
   try {
     await Staff.findByIdAndDelete(req.params.id);
@@ -98,14 +107,12 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// AUTO Face Recognition Punch API (No Dropdown Needed)
 app.post('/api/face-punch-auto', async (req, res) => {
   const { image } = req.body;
   try {
-    const staffList = await Staff.find();
+    const staffList = await Staff.find({ status: 'active' });
     let matchedStaff = null;
 
-    // Search and match exact registered face
     for(let staff of staffList) {
         if(compareFaceData(image, staff.registeredFace)) {
             matchedStaff = staff;
@@ -114,7 +121,7 @@ app.post('/api/face-punch-auto', async (req, res) => {
     }
 
     if(!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Face Not Recognized! Unregistered user.' });
+        return res.status(404).json({ success: false, error: 'Face Not Recognized or Staff Inactive!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -148,7 +155,6 @@ app.post('/api/face-punch-auto', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Manual Attendance Override
 app.post('/api/attendance/manual', async (req, res) => {
   const { staffId, date, status } = req.body;
   try {
@@ -162,7 +168,6 @@ app.post('/api/attendance/manual', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Today Status
 app.get('/api/attendance/today', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -171,25 +176,38 @@ app.get('/api/attendance/today', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Filtered Monthly Attendance Logs
+// Filtered Attendance Logs with Month & Year Support
 app.get('/api/attendance/all', async (req, res) => {
-  const { month } = req.query;
+  const { month, year } = req.query;
   try {
     let query = {};
-    if(month && month !== 'ALL') {
-        query.date = { $regex: `-${month.padStart(2, '0')}-` };
+    let dateRegexStr = "";
+
+    if(year && year !== 'ALL') {
+        dateRegexStr += year;
+    } else {
+        dateRegexStr += ".*";
     }
+
+    if(month && month !== 'ALL') {
+        dateRegexStr += `-${month.padStart(2, '0')}-`;
+    } else {
+        dateRegexStr += "-.*-";
+    }
+
+    if(month !== 'ALL' || year !== 'ALL') {
+        query.date = { $regex: dateRegexStr };
+    }
+
     const logs = await Attendance.find(query).populate('staffId').sort({ date: -1 });
     res.json({ success: true, data: logs });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Export CSV
 app.get('/api/export/csv', (req, res) => {
   res.download(excelFilePath, 'Staff_Attendance_Ledger.csv');
 });
 
-// Wildcard Route
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });

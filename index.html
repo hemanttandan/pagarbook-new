@@ -25,7 +25,6 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        /* Camera mirror fix */
         video { width: 100%; max-height: 240px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -35,12 +34,22 @@
         .bg-present { background: #065f46; color: #34d399; }
         .bg-completed { background: #0284c7; color: #e0f2fe; }
         .bg-halfday { background: #92400e; color: #fcd34d; }
+        .bg-active { background: #065f46; color: #34d399; cursor: pointer; }
+        .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
         
         .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
+
+        @media print {
+            body { background: #fff; color: #000; }
+            .no-print { display: none !important; }
+            .section { background: #fff !important; box-shadow: none !important; border: none !important; }
+            table, th, td { border: 1px solid #000 !important; color: #000 !important; }
+            th { background: #eee !important; color: #000 !important; }
+        }
     </style>
 </head>
 <body>
@@ -56,7 +65,7 @@
         </div>
     </header>
 
-    <!-- ================= 1. STAFF KIOSK DASHBOARD ================= -->
+    <!-- 1. STAFF KIOSK DASHBOARD -->
     <div id="staffKioskSection">
         <div class="grid-2">
             <div class="section">
@@ -89,9 +98,9 @@
         </div>
     </div>
 
-    <!-- ================= 2. ADMIN DASHBOARD (Alag-alag forms) ================= -->
+    <!-- 2. ADMIN DASHBOARD -->
     <div id="adminSection" style="display: none;">
-        <div class="section" style="background:#0f172a; border-left:4px solid #38bdf8;">
+        <div class="section no-print" style="background:#0f172a; border-left:4px solid #38bdf8;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>🔐 Admin Dashboard Control Panel</h3>
                 <button onclick="logoutAdmin()" class="btn-danger" style="width:auto; padding:6px 12px; font-size:12px;">Logout</button>
@@ -123,8 +132,8 @@
                     </div>
                     <div class="form-group">
                         <label>Or Live Camera Capture:</label>
-                        <video id="regVideo" autoplay playsinline style="max-height:100px;"></video>
-                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:5px; padding:6px;">📷 Capture Face</button>
+                        <video id="regVideo" autoplay playsinline style="max-height:90px;"></video>
+                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:5px; padding:5px;">📷 Capture Face</button>
                     </div>
                     <div id="faceCapturedBadge" style="display:none; color:#10b981; font-weight:bold; margin-top:5px;">✅ Face Image Attached!</div>
                 </div>
@@ -134,7 +143,7 @@
 
         <!-- Form 2: Registered Staff Directory -->
         <div class="section">
-            <h3>👥 Registered Staff Directory</h3>
+            <h3>👥 Registered Staff Directory (Active/Inactive)</h3>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
@@ -142,22 +151,23 @@
                             <th>Face Image</th>
                             <th>Name</th>
                             <th>Phone</th>
-                            <th>Monthly Salary</th>
+                            <th>Salary</th>
+                            <th>Status (Click to Toggle)</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="adminStaffTable">
-                        <tr><td colspan="5">Loading staff directory...</td></tr>
+                        <tr><td colspan="6">Loading staff directory...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Form 3: Attendance Logs with Month Filter -->
+        <!-- Form 3: Attendance Logs with Month & Year Filter -->
         <div class="section">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs</h3>
-                <div style="display:flex; gap:10px; align-items:center;">
+                <h3>📋 Monthly Attendance Logs & Export</h3>
+                <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                     <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                         <option value="ALL">All Months</option>
                         <option value="01">Jan</option><option value="02">Feb</option>
@@ -167,8 +177,18 @@
                         <option value="09">Sep</option><option value="10" selected>Oct</option>
                         <option value="11">Nov</option><option value="12">Dec</option>
                     </select>
+                    <select id="logYearFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
+                        <option value="ALL">All Years</option>
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                        <option value="2027">2027</option>
+                    </select>
                     <button onclick="openManualAttendanceModal()" class="btn-warning" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Manual Entry</button>
                 </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:10px;" class="no-print">
+                <button onclick="exportToCSV()" class="btn-warning" style="width:auto;">📥 Download Attendance Excel (CSV)</button>
+                <button onclick="window.print()" class="btn-success" style="width:auto;">🖨️ Print / Export Attendance PDF</button>
             </div>
             <div style="overflow-x: auto;">
                 <table>
@@ -189,32 +209,13 @@
             </div>
         </div>
 
-        <!-- Form 4: Export & Salary Report Form -->
+        <!-- Form 4: Salary Calculation & PDF Export Form -->
         <div class="section">
-            <h3>📊 Salary Calculation & Export</h3>
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Select Report Month & Year:</label>
-                    <div style="display:flex; gap:10px;">
-                        <select id="reportMonth">
-                            <option value="01">Jan</option><option value="02">Feb</option>
-                            <option value="03">Mar</option><option value="04">Apr</option>
-                            <option value="05">May</option><option value="06">Jun</option>
-                            <option value="07">Jul</option><option value="08">Aug</option>
-                            <option value="09">Sep</option><option value="10" selected>Oct</option>
-                            <option value="11">Nov</option><option value="12">Dec</option>
-                        </select>
-                        <select id="reportYear">
-                            <option value="2025">2025</option>
-                            <option value="2026" selected>2026</option>
-                            <option value="2027">2027</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="display:flex; align-items:flex-end; gap:10px;">
-                    <button onclick="exportToCSV()" class="btn-success">📥 Download Excel CSV</button>
-                </div>
+            <h3>📊 Salary Calculation & PDF Report</h3>
+            <div class="no-print" style="margin-bottom: 10px;">
+                <button onclick="window.print()" class="btn-success" style="width:auto;">🖨️ Print / Export Salary Report PDF</button>
             </div>
+            <p style="font-size: 13px; color: #94a3b8;">Note: Click the button above to generate a professional PDF report of attendance and salary sheets using your browser's Print-to-PDF feature.</p>
         </div>
     </div>
 </div>
@@ -402,23 +403,40 @@
             const result = await res.json();
             if(result.success) {
                 cachedStaffList = result.data;
-                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="5">No staff registered.</td></tr>'; return; }
+                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No staff registered.</td></tr>'; return; }
                 
                 tbody.innerHTML = '';
                 result.data.forEach(staff => {
                     const faceSrc = staff.registeredFace || 'https://via.placeholder.com/45';
+                    const isActive = staff.status !== 'inactive';
+                    const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
+                    const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
+
                     tbody.innerHTML += `
                         <tr>
                             <td><img src="${faceSrc}" class="face-img-thumb" alt="face"></td>
                             <td><strong>${staff.name}</strong></td>
                             <td>${staff.phone}</td>
                             <td>₹${staff.salaryAmount}</td>
+                            <td><span class="badge ${statusBadgeClass}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${statusText}</span></td>
                             <td><button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button></td>
                         </tr>
                     `;
                 });
             }
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="5">Error loading directory.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading directory.</td></tr>'; }
+    }
+
+    async function toggleStaffStatus(id, currentStatus) {
+        const newStatus = (currentStatus === 'inactive') ? 'active' : 'inactive';
+        try {
+            await fetch(`${API_URL}/staff/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            loadStaffDirectory();
+        } catch(err) { alert('Status update failed!'); }
     }
 
     async function deleteStaff(id) {
@@ -429,9 +447,10 @@
 
     async function loadFilteredAttendanceLogs() {
         const month = document.getElementById('logMonthFilter').value;
+        const year = document.getElementById('logYearFilter').value;
         const tbody = document.getElementById('adminAttendanceTable');
         try {
-            const res = await fetch(`${API_URL}/attendance/all?month=${month}`);
+            const res = await fetch(`${API_URL}/attendance/all?month=${month}&year=${year}`);
             const result = await res.json();
             if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No logs found.</td></tr>'; return; }
             
@@ -479,7 +498,9 @@
     function openManualAttendanceModal() {
         const select = document.getElementById('manualStaffSelect');
         select.innerHTML = '';
-        cachedStaffList.forEach(s => select.innerHTML += `<option value="${s._id}">${s.name}</option>`);
+        cachedStaffList.forEach(s => {
+            if(s.status !== 'inactive') select.innerHTML += `<option value="${s._id}">${s.name}</option>`;
+        });
         document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
         document.getElementById('manualModal').style.display = 'flex';
     }
