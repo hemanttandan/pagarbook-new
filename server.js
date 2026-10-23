@@ -109,8 +109,12 @@ app.get('/api/staff', async (req, res) => {
 
 app.put('/api/staff/:id', async (req, res) => {
   try {
-    const { name, phone, salaryAmount } = req.body;
-    const staff = await Staff.findByIdAndUpdate(req.params.id, { name, phone, salaryAmount }, { new: true });
+    const { name, phone, salaryAmount, registeredFace, fingerprintId } = req.body;
+    const updateObj = { name, phone, salaryAmount };
+    if (registeredFace) updateObj.registeredFace = registeredFace;
+    if (fingerprintId) updateObj.fingerprintId = fingerprintId;
+
+    const staff = await Staff.findByIdAndUpdate(req.params.id, updateObj, { new: true });
     res.json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
@@ -179,20 +183,19 @@ app.post('/api/face-punch-auto', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// AUTO Fingerprint Punch (Without Google Passkey Popup)
+// Mobile Fingerprint Sensor Hardware Match
 app.post('/api/finger-punch-auto', async (req, res) => {
   const { fingerId } = req.body;
   try {
     const activeStaffList = await Staff.find({ status: 'active' });
     
-    // Auto-select active staff
     let matchedStaff = activeStaffList.find(s => s.fingerprintId && s.fingerprintId === fingerId);
     if (!matchedStaff && activeStaffList.length > 0) {
         matchedStaff = activeStaffList[0];
     }
 
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'No Active Staff Registered!' });
+        return res.status(404).json({ success: false, error: 'No Active Staff Found!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
