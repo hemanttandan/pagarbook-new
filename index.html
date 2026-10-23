@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 980px; margin: auto; }
+        .container { max-width: 1100px; margin: auto; }
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
         h1, h2, h3 { margin: 0; color: #38bdf8; }
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -38,8 +38,9 @@
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; text-align: left; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; text-align: left; }
         
+        .thumb-img { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
         @media print {
@@ -80,7 +81,7 @@
                     <h2 id="verifiedStaffName" style="color:#34d399; margin:4px 0;">-</h2>
                 </div>
 
-                <!-- Step 2: Camera Stream (Visible only after valid PIN) -->
+                <!-- Step 2: Camera Stream -->
                 <div id="cameraStepBox" style="display:none;">
                     <h3>📸 Step 2: Capture Live Photo</h3>
                     <video id="kioskVideo" autoplay playsinline></video>
@@ -121,7 +122,48 @@
             </div>
         </div>
 
-        <!-- Form 1: Register New Staff -->
+        <!-- BOX 1: ALLOWED LOCATION MANAGEMENT -->
+        <div class="section no-print" style="border:1px solid #38bdf8;">
+            <h3>📍 Manage Allowed Office Locations (Geofencing)</h3>
+            <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Lat,Lng coordinates daal kar office locations allow karein</p>
+            
+            <div class="grid-2">
+                <div>
+                    <div class="form-group">
+                        <label>Location Name (e.g. Shop 1 / Main Branch):</label>
+                        <input type="text" id="locNameInput" placeholder="Enter Location Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Google Maps URL or Lat,Lng Coordinates:</label>
+                        <input type="text" id="locUrlInput" placeholder="e.g. https://maps.app.goo.gl/... or 21.2514,81.6296">
+                    </div>
+                    <div class="form-group">
+                        <label>Allowed Radius (Meters):</label>
+                        <input type="number" id="locRadiusInput" value="100" placeholder="Default 100 meters">
+                    </div>
+                    <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
+                </div>
+                <div>
+                    <label>Currently Allowed Locations List:</label>
+                    <div style="max-height:200px; overflow-y:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Radius</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allowedLocationsTable">
+                                <tr><td colspan="3">Loading locations...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOX 2: REGISTER NEW STAFF -->
         <div class="section no-print">
             <h3>➕ Register New Staff Master</h3>
             <div class="grid-2">
@@ -138,11 +180,16 @@
                         <label>Monthly Salary (₹):</label>
                         <input type="number" id="regSalary" placeholder="Enter salary">
                     </div>
-                </div>
-                <div>
                     <div class="form-group">
                         <label>Staff 4-Digit Attendance PIN:</label>
                         <input type="text" id="regPin" placeholder="Example: 1234">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>Staff Photo (Proof/Identity):</label>
+                        <input type="file" id="regPhotoInput" accept="image/*" onchange="handleStaffPhotoSelect(event)">
+                        <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Photo Uploaded</span>
                     </div>
                     <div class="form-group">
                         <label>Attach Staff Document (Aadhaar/PAN/PDF):</label>
@@ -154,13 +201,14 @@
             <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Profile</button>
         </div>
 
-        <!-- Form 2: Registered Staff Directory -->
+        <!-- BOX 3: REGISTERED STAFF DIRECTORY -->
         <div class="section no-print">
             <h3>👥 Registered Staff Directory</h3>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
+                            <th>Photo</th>
                             <th>PIN</th>
                             <th>Name</th>
                             <th>Phone</th>
@@ -171,16 +219,16 @@
                         </tr>
                     </thead>
                     <tbody id="adminStaffTable">
-                        <tr><td colspan="7">Loading staff directory...</td></tr>
+                        <tr><td colspan="8">Loading staff directory...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Form 3: Attendance Logs -->
+        <!-- BOX 4: ATTENDANCE LOGS WITH PUNCH PHOTOS & IST TIME -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs</h3>
+                <h3>📋 Monthly Attendance Logs (With Photos & IST Time)</h3>
                 <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                     <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                         <option value="ALL">All Months</option>
@@ -214,23 +262,24 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Punch Photo</th>
                             <th>Date</th>
                             <th>Staff Name</th>
-                            <th>Punch IN</th>
-                            <th>Punch OUT</th>
+                            <th>Punch IN (IST)</th>
+                            <th>Punch OUT (IST)</th>
                             <th>Work Hours</th>
                             <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="adminAttendanceTable">
-                        <tr><td colspan="7">Loading logs...</td></tr>
+                        <tr><td colspan="8">Loading logs...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Form 4: Salary Sheet -->
+        <!-- BOX 5: SALARY CALCULATION SHEET -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
@@ -347,6 +396,15 @@
     </div>
 </div>
 
+<!-- Modal: Image / Document Preview -->
+<div id="previewModal" class="modal">
+    <div class="modal-content" style="text-align:center; max-width:600px;">
+        <h3 id="previewTitle">Preview</h3>
+        <div id="previewBody" style="margin-top:15px; max-height:400px; overflow:auto;"></div>
+        <button onclick="closeModal('previewModal')" class="btn-danger" style="margin-top:15px;">Close</button>
+    </div>
+</div>
+
 <!-- Modal: Manual Entry -->
 <div id="manualModal" class="modal">
     <div class="modal-content">
@@ -376,6 +434,7 @@
     const API_URL = '/api';
     let isAdminLoggedIn = false;
     let registeredDocBase64 = '';
+    let registeredPhotoBase64 = '';
     let currentVerifiedStaff = null;
     let cachedStaffList = [];
 
@@ -468,9 +527,8 @@
 
         if(!currentVerifiedStaff || !pin) { alert('Please enter valid PIN first!'); return; }
 
-        // Capture Canvas Live Photo
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 160; canvas.height = 160;
+        canvas.width = 240; canvas.height = 240;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
         const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
@@ -498,7 +556,6 @@
                     if(result.success) {
                         statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
                         
-                        // Reset Inputs
                         document.getElementById('staffPinInput').value = '';
                         document.getElementById('staffNameDisplayBox').style.display = 'none';
                         document.getElementById('cameraStepBox').style.display = 'none';
@@ -516,6 +573,18 @@
             }, { enableHighAccuracy: true, timeout: 10000 });
         } else {
             statusBox.innerHTML = '❌ Geolocation Not Supported by Browser!';
+        }
+    }
+
+    function handleStaffPhotoSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                registeredPhotoBase64 = evt.target.result;
+                document.getElementById('photoBadge').style.display = 'inline';
+            };
+            reader.readAsDataURL(file);
         }
     }
 
@@ -548,6 +617,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     name, phone, salaryAmount, pin,
+                    photo: registeredPhotoBase64 || '',
                     documentFile: registeredDocBase64 || ''
                 })
             });
@@ -559,15 +629,66 @@
                 document.getElementById('regSalary').value = '';
                 document.getElementById('regPin').value = '';
                 document.getElementById('docBadge').style.display = 'none';
-                registeredDocBase64 = '';
+                document.getElementById('photoBadge').style.display = 'none';
+                registeredDocBase64 = ''; registeredPhotoBase64 = '';
                 loadAdminData();
             } else { alert('Error: ' + data.error); }
         } catch(err) { alert('Registration failed!'); }
     }
 
     async function loadAdminData() {
+        loadAllowedLocations();
         loadStaffDirectory();
         loadFilteredAttendanceLogs();
+    }
+
+    // 📍 LOCATION MANAGEMENT LOGIC
+    async function loadAllowedLocations() {
+        const tbody = document.getElementById('allowedLocationsTable');
+        try {
+            const res = await fetch(`${API_URL}/locations`);
+            const result = await res.json();
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="3">No locations allowed yet.</td></tr>'; return; }
+            tbody.innerHTML = '';
+            result.data.forEach(loc => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${loc.name}</strong></td>
+                        <td>${loc.radiusMeters} m</td>
+                        <td><button onclick="deleteLocation('${loc._id}')" class="btn-danger" style="padding:4px 8px; font-size:11px;">Delete</button></td>
+                    </tr>
+                `;
+            });
+        } catch(e) { tbody.innerHTML = '<tr><td colspan="3">Error loading locations</td></tr>'; }
+    }
+
+    async function addAllowedLocation() {
+        const name = document.getElementById('locNameInput').value;
+        const urlOrCoords = document.getElementById('locUrlInput').value;
+        const radiusMeters = document.getElementById('locRadiusInput').value;
+
+        if(!name || !urlOrCoords) { alert('Please enter Location Name and Google Maps Link / Coordinates!'); return; }
+
+        try {
+            const res = await fetch(`${API_URL}/locations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, urlOrCoords, radiusMeters: Number(radiusMeters) })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert('Allowed Location Added Successfully!');
+                document.getElementById('locNameInput').value = '';
+                document.getElementById('locUrlInput').value = '';
+                loadAllowedLocations();
+            } else { alert('Error: ' + data.error); }
+        } catch(e) { alert('Failed to add location!'); }
+    }
+
+    async function deleteLocation(id) {
+        if(!confirm('Delete this allowed location?')) return;
+        await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' });
+        loadAllowedLocations();
     }
 
     async function loadStaffDirectory() {
@@ -577,17 +698,19 @@
             const result = await res.json();
             if(result.success) {
                 cachedStaffList = result.data;
-                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="7">No staff registered.</td></tr>'; return; }
+                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="8">No staff registered.</td></tr>'; return; }
                 
                 tbody.innerHTML = '';
                 result.data.forEach(staff => {
                     const isActive = staff.status !== 'inactive';
                     const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
                     const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
-                    const docLink = staff.documentFile ? `<a href="${staff.documentFile}" target="_blank" style="color:#38bdf8;">📄 View Doc</a>` : 'No Doc';
+                    const photoImg = staff.photo ? `<img src="${staff.photo}" class="thumb-img" onclick="openPreviewModal('Staff Photo', '${staff.photo}')">` : 'No Photo';
+                    const docLink = staff.documentFile ? `<button onclick="openPreviewDocModal('${staff.name} Document', '${staff.documentFile}')" class="btn-warning" style="padding:4px 8px; font-size:11px;">📄 Preview Doc</button>` : 'No Doc';
 
                     tbody.innerHTML += `
                         <tr>
+                            <td>${photoImg}</td>
                             <td><strong style="color:#38bdf8;">${staff.pin || 'N/A'}</strong></td>
                             <td><strong>${staff.name}</strong></td>
                             <td>${staff.phone}</td>
@@ -602,7 +725,23 @@
                     `;
                 });
             }
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="7">Error loading directory.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="8">Error loading directory.</td></tr>'; }
+    }
+
+    function openPreviewModal(title, imageSrc) {
+        document.getElementById('previewTitle').innerText = title;
+        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:100%; border-radius:8px;">`;
+        document.getElementById('previewModal').style.display = 'flex';
+    }
+
+    function openPreviewDocModal(title, docSrc) {
+        document.getElementById('previewTitle').innerText = title;
+        if(docSrc.startsWith('data:application/pdf')) {
+            document.getElementById('previewBody').innerHTML = `<iframe src="${docSrc}" style="width:100%; height:350px;" frameborder="0"></iframe>`;
+        } else {
+            document.getElementById('previewBody').innerHTML = `<img src="${docSrc}" style="max-width:100%; border-radius:8px;">`;
+        }
+        document.getElementById('previewModal').style.display = 'flex';
     }
 
     function openEditStaff(id, name, phone, salary, pin) {
@@ -661,23 +800,25 @@
         try {
             const res = await fetch(`${API_URL}/attendance/all?month=${month}&year=${year}`);
             const result = await res.json();
-            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="7">No logs found.</td></tr>'; return; }
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="8">No logs found.</td></tr>'; return; }
             
             tbody.innerHTML = '';
             result.data.forEach(row => {
+                const photoThumb = row.punchPhoto ? `<img src="${row.punchPhoto}" class="thumb-img" onclick="openPreviewModal('Punch Captured Photo', '${row.punchPhoto}')">` : 'No Photo';
                 tbody.innerHTML += `
                     <tr>
+                        <td>${photoThumb}</td>
                         <td>${row.date}</td>
                         <td><strong>${row.staffId ? row.staffId.name : 'N/A'}</strong></td>
-                        <td>${row.punchIn || 'N/A'}</td>
-                        <td>${row.punchOut || 'N/A'}</td>
+                        <td><span style="color:#10b981; font-weight:bold;">${row.punchIn || 'N/A'}</span></td>
+                        <td><span style="color:#38bdf8; font-weight:bold;">${row.punchOut || 'N/A'}</span></td>
                         <td>${row.workHours || 0} hrs</td>
                         <td><span class="badge bg-present">${row.status.toUpperCase()}</span></td>
                         <td><button onclick="openEditPunchModal('${row._id}', '${row.punchIn || ''}', '${row.punchOut || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px;">Edit Time</button></td>
                     </tr>
                 `;
             });
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="7">Error loading logs.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="8">Error loading logs.</td></tr>'; }
     }
 
     function openEditPunchModal(id, punchIn, punchOut) {

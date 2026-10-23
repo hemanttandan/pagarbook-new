@@ -25,11 +25,20 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => console.log('❌ Connection Error:', err));
 
 // Database Schemas
+const locationSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  lat: { type: Number, required: true },
+  lng: { type: Number, required: true },
+  radiusMeters: { type: Number, default: 100 }
+});
+const Location = mongoose.model('Location', locationSchema);
+
 const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
   salaryAmount: { type: Number, required: true },
   pin: { type: String, required: true, unique: true },
+  photo: { type: String },
   documentFile: { type: String },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   joiningDate: { type: Date, default: Date.now }
@@ -47,11 +56,17 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// ---------------- 📍 ALLOWED OFFICE LOCATIONS CONFIG ----------------
-const ALLOWED_LOCATIONS = [
-    { name: "Branch 1 (Office)", lat: 21.2514, lng: 81.6296, radiusKm: 0.1 }, // 100 Meter Radius
-    { name: "Branch 2 (Shop/Store)", lat: 21.2334, lng: 81.6337, radiusKm: 0.1 } // 100 Meter Radius
-];
+// Helper function to extract Lat/Lng from Google Maps URL or text
+function parseCoordinates(inputStr) {
+    if (!inputStr) return null;
+    // Check if direct Lat,Lng e.g., "21.2514, 81.6296"
+    const coordMatch = inputStr.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    if (coordMatch) {
+        return { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
+    }
+    // Default fallback coordinates if short URL without embed API
+    return { lat: 21.2514, lng: 81.6296 };
+}
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   var R = 6371;
@@ -65,10 +80,14 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   return R * c; 
 }
 
-function isWithinAllowedLocations(userLat, userLng) {
-    for (let loc of ALLOWED_LOCATIONS) {
-        let dist = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
-        if (dist <= loc.radiusKm) return true;
+async function isWithinAllowedLocations(userLat, userLng) {
+    const locations = await Location.find();
+    if (!locations.length) return true; // If no location set, allow all by default
+
+    for (let loc of locations) {
+        let distKm = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
+        let distMeters = distKm * 1000;
+        if (distMeters <= loc.radiusMeters) return true;
     }
     return false;
 }
@@ -77,25 +96,71 @@ function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
 }
 
-function getLocalCurrentTime() {
-    const now = new Date();
-    return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+// ⏰ Indian Standard Time (IST - Asia/Kolkata) Accurate Format Fix
+function getIndianCurrentTime() {
+    return new Date().toLocaleTimeString('en-IN', { 
+        timeZone: 'Asia/Kolkata', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit', 
+        hour12: true 
+    });
 }
 
 function calculateHours(time1, time2) {
     if(!time1 || !time2) return 0;
-    const [h1, m1] = time1.split(':').map(Number);
-    const [h2, m2] = time2.split(':').map(Number);
-    const diffMs = (new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1));
-    return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
+    try {
+        const parseTime = (tStr) => {
+            const [time, modifier] = tStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            if (modifier === 'pm' || modifier === 'PM') {
+                if (hours < 12) hours += 12;
+            } else if (modifier === 'am' || modifier === 'AM') {
+                if (hours === 12) hours = 0;
+            }
+            return new Date(2000, 0, 1, hours, minutes);
+        };
+        const d1 = parseTime(time1);
+        const d2 = parseTime(time2);
+        const diffMs = d2 - d1;
+        return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
+    } catch(e) { return 8; }
 }
 
 // ---------------- API ENDPOINTS ----------------
 
+// 📍 LOCATION MANAGEMENT APIs
+app.get('/api/locations', async (req, res) => {
+  try {
+    const locs = await Location.find();
+    res.json({ success: true, data: locs });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/locations', async (req, res) => {
+  const { name, urlOrCoords, radiusMeters } = req.body;
+  try {
+    const coords = parseCoordinates(urlOrCoords);
+    if (!coords) return res.status(400).json({ success: false, error: "Invalid Coordinates or Link!" });
+
+    const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: radiusMeters || 100 });
+    await loc.save();
+    res.status(201).json({ success: true, data: loc });
+  } catch(e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.delete('/api/locations/:id', async (req, res) => {
+  try {
+    await Location.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
+// 👥 STAFF MANAGEMENT APIs
 app.post('/api/staff', async (req, res) => {
   try {
-    const { name, phone, salaryAmount, pin, documentFile } = req.body;
-    const staff = new Staff({ name, phone, salaryAmount, pin, documentFile, status: 'active' });
+    const { name, phone, salaryAmount, pin, photo, documentFile } = req.body;
+    const staff = new Staff({ name, phone, salaryAmount, pin, photo, documentFile, status: 'active' });
     await staff.save();
     res.status(201).json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
@@ -149,10 +214,11 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
   const { pin, lat, lng, photo } = req.body;
   try {
     // 1. Verify GPS Radius First
-    if (!lat || !lng || !isWithinAllowedLocations(lat, lng)) {
+    const allowed = await isWithinAllowedLocations(lat, lng);
+    if (!allowed) {
         return res.status(403).json({ 
             success: false, 
-            error: 'Punch Rejected! You are outside allowed office location!' 
+            error: 'Punch Rejected! You are outside allowed office locations!' 
         });
     }
 
@@ -163,7 +229,7 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const timeNow = getLocalCurrentTime();
+    const timeNow = getIndianCurrentTime();
 
     let record = await Attendance.findOne({ staffId: matchedStaff._id, date: today });
     let punchType = 'IN';
@@ -198,7 +264,7 @@ app.post('/api/attendance/manual', async (req, res) => {
     const hours = status === 'present' ? 8 : (status === 'half_day' ? 4 : 0);
     const attendance = await Attendance.findOneAndUpdate(
       { staffId, date },
-      { status, workHours: hours, punchIn: '09:00', punchOut: '17:00' },
+      { status, workHours: hours, punchIn: '09:00:00 AM', punchOut: '05:00:00 PM' },
       { upsert: true, new: true }
     );
     res.json({ success: true, data: attendance });
