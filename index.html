@@ -7,12 +7,23 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 1100px; margin: auto; }
+        .container { max-width: 1200px; margin: auto; }
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
         h1, h2, h3 { margin: 0; color: #38bdf8; }
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .nav-btn:hover { background: #0369a1; }
-        .section { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        
+        /* Layout with Collapsible Sidebar */
+        .admin-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+        @media(max-width: 768px) { .admin-layout { grid-template-columns: 1fr; } }
+
+        .sidebar { background: #1e293b; padding: 15px; border-radius: 12px; height: fit-content; }
+        .menu-item { display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: #94a3b8; text-decoration: none; font-weight: 600; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: 0.2s; }
+        .menu-item:hover, .menu-item.active { background: #0284c7; color: #fff; }
+
+        .section { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; }
+        .section.active-section { display: block; }
+
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
         
@@ -25,7 +36,8 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        video { width: 100%; max-height: 200px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
+        video { width: 180px; height: 220px; object-fit: cover; border-radius: 50%; border: 3px solid #38bdf8; display: block; margin: 0 auto; transform: scaleX(-1); background: #000; }
+        #regStaffCam { width: 160px; height: 200px; border-radius: 12px; border: 2px solid #38bdf8; object-fit: cover; margin-bottom: 8px; display: block; margin-left: auto; margin-right: auto; transform: scaleX(-1); }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
@@ -40,7 +52,7 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 480px; text-align: left; }
         
-        .thumb-img { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
+        .thumb-img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
         @media print {
@@ -58,7 +70,7 @@
     <header class="no-print">
         <div>
             <h1>📱 Attendance App</h1>
-            <small style="color:#94a3b8;" id="viewSubtitle">PIN + Photo + GPS Verification Kiosk</small>
+            <small style="color:#94a3b8;" id="viewSubtitle">PIN + Face Capture + GPS Verification Kiosk</small>
         </div>
         <div>
             <button class="nav-btn" id="toggleViewBtn" onclick="toggleView()">🔑 Admin Login</button>
@@ -68,11 +80,11 @@
     <!-- 1. STAFF KIOSK DASHBOARD -->
     <div id="staffKioskSection">
         <div class="grid-2">
-            <div class="section">
+            <div class="section active-section" style="text-align:center; display:block;">
                 <h3>🔢 Step 1: Enter Staff PIN</h3>
                 
                 <div class="form-group" style="margin-top: 10px;">
-                    <label>Enter 4-Digit PIN:</label>
+                    <label style="text-align:left;">Enter 4-Digit PIN:</label>
                     <input type="password" id="staffPinInput" placeholder="Enter PIN" style="font-size: 20px; text-align: center; letter-spacing: 5px;" oninput="verifyPinAndShowName()">
                 </div>
 
@@ -81,20 +93,21 @@
                     <h2 id="verifiedStaffName" style="color:#34d399; margin:4px 0;">-</h2>
                 </div>
 
-                <!-- Step 2: Camera Stream -->
                 <div id="cameraStepBox" style="display:none;">
-                    <h3>📸 Step 2: Capture Live Photo</h3>
-                    <video id="kioskVideo" autoplay playsinline></video>
-                    <button onclick="captureAndSubmitPunch()" class="btn-success" style="padding:12px; font-size:16px; margin-top:10px;">📷 Capture Photo & Submit Punch</button>
+                    <h3>📸 Step 2: Capture Passport Face</h3>
+                    <div style="margin: 10px 0;">
+                        <video id="kioskVideo" autoplay playsinline></video>
+                    </div>
+                    <button onclick="captureAndSubmitPunch()" class="btn-success" style="padding:12px; font-size:16px; margin-top:10px;">📷 Capture Face & Submit Punch</button>
                 </div>
 
-                <div id="punchStatusBox" class="status-box" style="display:none;"></div>
+                <div id="punchStatusBox" class="status-box" style="display:none; text-align:left;"></div>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
             </div>
 
-            <div class="section">
+            <div class="section active-section" style="display:block;">
                 <h3>🟢 Working Staff Status (Today)</h3>
-                <div style="max-height: 320px; overflow-y: auto;">
+                <div style="max-height: 350px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -113,232 +126,207 @@
         </div>
     </div>
 
-    <!-- 2. ADMIN DASHBOARD -->
+    <!-- 2. ADMIN DASHBOARD WITH COLLAPSIBLE SIDEBAR -->
     <div id="adminSection" style="display: none;">
-        <div class="section no-print" style="background:#0f172a; border-left:4px solid #38bdf8;">
+        <div class="section no-print active-section" style="background:#0f172a; border-left:4px solid #38bdf8; display:block; margin-bottom:15px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>🔐 Admin Control Panel</h3>
-                <button onclick="logoutAdmin()" class="btn-danger" style="width:auto; padding:6px 12px; font-size:12px;">Logout</button>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="openAdminPwdModal()" class="btn-warning" style="width:auto; padding:6px 12px; font-size:12px;">🔑 Change Password</button>
+                    <button onclick="logoutAdmin()" class="btn-danger" style="width:auto; padding:6px 12px; font-size:12px;">Logout</button>
+                </div>
             </div>
         </div>
 
-        <!-- BOX 1: ALLOWED LOCATION MANAGEMENT -->
-        <div class="section no-print" style="border:1px solid #38bdf8;">
-            <h3>📍 Manage Allowed Office Locations (Geofencing)</h3>
-            <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Lat,Lng coordinates daal kar office locations allow karein</p>
-            
-            <div class="grid-2">
-                <div>
-                    <div class="form-group">
-                        <label>Location Name (e.g. Shop 1 / Main Branch):</label>
-                        <input type="text" id="locNameInput" placeholder="Enter Location Name">
+        <div class="admin-layout">
+            <!-- Sidebar Navigation -->
+            <div class="sidebar no-print">
+                <div class="menu-item active" onclick="switchAdminTab('locations', this)">📍 Allowed Locations</div>
+                <div class="menu-item" onclick="switchAdminTab('regStaff', this)">➕ Register Staff</div>
+                <div class="menu-item" onclick="switchAdminTab('directory', this)">👥 Staff Directory</div>
+                <div class="menu-item" onclick="switchAdminTab('logs', this)">📋 Attendance Logs</div>
+                <div class="menu-item" onclick="switchAdminTab('salary', this)">💰 Salary Sheet</div>
+            </div>
+
+            <!-- Tab Content Area -->
+            <div>
+                <!-- TAB 1: LOCATIONS -->
+                <div id="tab-locations" class="section active-section" style="border:1px solid #38bdf8;">
+                    <h3>📍 Manage Allowed Office Locations (Geofencing)</h3>
+                    <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Lat,Lng coordinates daal kar office locations allow karein</p>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <div class="form-group">
+                                <label>Location Name:</label>
+                                <input type="text" id="locNameInput" placeholder="Enter Location Name">
+                            </div>
+                            <div class="form-group">
+                                <label>Google Maps URL or Lat,Lng:</label>
+                                <input type="text" id="locUrlInput" placeholder="e.g. https://maps.app.goo.gl/... or 21.2514,81.6296">
+                            </div>
+                            <div class="form-group">
+                                <label>Allowed Radius (Meters):</label>
+                                <input type="number" id="locRadiusInput" value="500">
+                            </div>
+                            <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
+                        </div>
+                        <div>
+                            <label>Allowed Locations List:</label>
+                            <div style="max-height:200px; overflow-y:auto;">
+                                <table>
+                                    <thead>
+                                        <tr><th>Name</th><th>Radius</th><th>Action</th></tr>
+                                    </thead>
+                                    <tbody id="allowedLocationsTable">
+                                        <tr><td colspan="3">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Google Maps URL or Lat,Lng Coordinates:</label>
-                        <input type="text" id="locUrlInput" placeholder="e.g. https://maps.app.goo.gl/... or 21.2514,81.6296">
-                    </div>
-                    <div class="form-group">
-                        <label>Allowed Radius (Meters):</label>
-                        <input type="number" id="locRadiusInput" value="500" placeholder="Default 500 meters">
-                    </div>
-                    <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
                 </div>
-                <div>
-                    <label>Currently Allowed Locations List:</label>
-                    <div style="max-height:200px; overflow-y:auto;">
+
+                <!-- TAB 2: REGISTER STAFF -->
+                <div id="tab-regStaff" class="section">
+                    <h3>➕ Register New Staff Master</h3>
+                    <div class="grid-2">
+                        <div>
+                            <div class="form-group">
+                                <label>Full Name:</label>
+                                <input type="text" id="regName" placeholder="Enter staff name">
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number:</label>
+                                <input type="text" id="regPhone" placeholder="Enter phone number">
+                            </div>
+                            <div class="form-group">
+                                <label>Monthly Salary (₹):</label>
+                                <input type="number" id="regSalary" placeholder="Enter salary">
+                            </div>
+                            <div class="form-group">
+                                <label>Staff 4-Digit Attendance PIN:</label>
+                                <input type="text" id="regPin" placeholder="Example: 1234">
+                            </div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div class="form-group">
+                                <label style="text-align:left;">Staff Passport Face Photo:</label>
+                                <video id="regStaffCam" autoplay playsinline style="display:none;"></video>
+                                <div style="display:flex; gap:5px; justify-content:center; margin-bottom:5px;">
+                                    <button type="button" onclick="startRegCamera()" class="btn-warning" style="padding:6px; font-size:12px; width:auto;">📷 Open Camera</button>
+                                    <button type="button" onclick="captureRegCamera()" id="regCapBtn" class="btn-success" style="display:none; padding:6px; font-size:12px; width:auto;">📸 Capture</button>
+                                </div>
+                                <p style="font-size:11px; color:#94a3b8; margin:3px 0;">OR Select File:</p>
+                                <input type="file" id="regPhotoInput" accept="image/*" onchange="handleStaffPhotoSelect(event)">
+                                <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Face Photo Ready</span>
+                            </div>
+                            <div class="form-group" style="text-align:left;">
+                                <label>Attach Document (Aadhaar/PAN/PDF):</label>
+                                <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleDocSelect(event)">
+                                <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Document Attached</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Profile</button>
+                </div>
+
+                <!-- TAB 3: STAFF DIRECTORY -->
+                <div id="tab-directory" class="section">
+                    <h3>👥 Registered Staff Directory</h3>
+                    <div style="overflow-x: auto;">
                         <table>
                             <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Radius</th>
-                                    <th>Action</th>
-                                </tr>
+                                <tr><th>Face Photo</th><th>PIN</th><th>Name</th><th>Phone</th><th>Salary</th><th>Document</th><th>Status</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="allowedLocationsTable">
-                                <tr><td colspan="3">Loading locations...</td></tr>
+                            <tbody id="adminStaffTable">
+                                <tr><td colspan="8">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- BOX 2: REGISTER NEW STAFF -->
-        <div class="section no-print">
-            <h3>➕ Register New Staff Master</h3>
-            <div class="grid-2">
-                <div>
-                    <div class="form-group">
-                        <label>Full Name:</label>
-                        <input type="text" id="regName" placeholder="Enter staff name">
-                    </div>
-                    <div class="form-group">
-                        <label>Phone Number:</label>
-                        <input type="text" id="regPhone" placeholder="Enter phone number">
-                    </div>
-                    <div class="form-group">
-                        <label>Monthly Salary (₹):</label>
-                        <input type="number" id="regSalary" placeholder="Enter salary">
-                    </div>
-                    <div class="form-group">
-                        <label>Staff 4-Digit Attendance PIN:</label>
-                        <input type="text" id="regPin" placeholder="Example: 1234">
-                    </div>
-                </div>
-                <div>
-                    <div class="form-group">
-                        <label>Staff Photo (Proof/Identity):</label>
-                        <video id="regStaffCam" autoplay playsinline style="display:none; max-height:120px; width:100%; margin-bottom:5px;"></video>
-                        <div style="display:flex; gap:5px;">
-                            <button type="button" onclick="startRegCamera()" class="btn-warning" style="padding:6px; font-size:12px;">📷 Open Live Camera</button>
-                            <button type="button" onclick="captureRegCamera()" id="regCapBtn" class="btn-success" style="display:none; padding:6px; font-size:12px;">📸 Capture Photo</button>
+                <!-- TAB 4: ATTENDANCE LOGS -->
+                <div id="tab-logs" class="section printable-report">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h3>📋 Monthly Attendance Logs</h3>
+                        <div style="display:flex; gap:8px; align-items:center;" class="no-print">
+                            <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
+                                <option value="ALL">All Months</option>
+                                <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Apr</option>
+                                <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Aug</option>
+                                <option value="09">Sep</option><option value="10" selected>Oct</option>
+                                <option value="11">Nov</option><option value="12">Dec</option>
+                            </select>
+                            <select id="logYearFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
+                                <option value="ALL">All Years</option>
+                                <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+                            </select>
+                            <button onclick="openManualAttendanceModal()" class="btn-warning" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Manual</button>
                         </div>
-                        <p style="font-size:11px; color:#94a3b8; margin:5px 0;">OR Select File:</p>
-                        <input type="file" id="regPhotoInput" accept="image/*" onchange="handleStaffPhotoSelect(event)">
-                        <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Photo Ready</span>
                     </div>
-                    <div class="form-group">
-                        <label>Attach Staff Document (Aadhaar/PAN/PDF):</label>
-                        <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleDocSelect(event)">
-                        <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Document Attached</span>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
+                        <label style="margin:0; font-weight:bold;">Export:</label>
+                        <select id="exportFormatSelect" style="width:auto; padding:8px;">
+                            <option value="excel">📥 Excel (CSV)</option>
+                            <option value="pdf">📄 PDF Document</option>
+                        </select>
+                        <button onclick="handleExport()" class="btn-success" style="width:auto; padding:8px 16px;">Export Report</button>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>Face Photo</th><th>Date</th><th>Staff Name</th><th>Punch IN</th><th>Punch OUT</th><th>Hours</th><th>Status</th><th>Action</th></tr>
+                            </thead>
+                            <tbody id="adminAttendanceTable">
+                                <tr><td colspan="8">Loading logs...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-            <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Profile</button>
-        </div>
 
-        <!-- BOX 3: REGISTERED STAFF DIRECTORY -->
-        <div class="section no-print">
-            <h3>👥 Registered Staff Directory</h3>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Photo</th>
-                            <th>PIN</th>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Salary</th>
-                            <th>Document</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminStaffTable">
-                        <tr><td colspan="8">Loading staff directory...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                <!-- TAB 5: SALARY SHEET -->
+                <div id="tab-salary" class="section printable-report">
+                    <h3>💰 Monthly Salary Calculation Sheet</h3>
+                    <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Select Month:</label>
+                            <select id="salMonth">
+                                <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Apr</option>
+                                <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Aug</option>
+                                <option value="09">Sep</option><option value="10" selected>Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Select Year:</label>
+                            <select id="salYear">
+                                <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+                            </select>
+                        </div>
+                    </div>
 
-        <!-- BOX 4: ATTENDANCE LOGS -->
-        <div class="section printable-report">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📋 Monthly Attendance Logs</h3>
-                <div style="display:flex; gap:8px; align-items:center;" class="no-print">
-                    <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
-                        <option value="ALL">All Months</option>
-                        <option value="01">Jan</option><option value="02">Feb</option>
-                        <option value="03">Mar</option><option value="04">Apr</option>
-                        <option value="05">May</option><option value="06">Jun</option>
-                        <option value="07">Jul</option><option value="08">Aug</option>
-                        <option value="09">Sep</option><option value="10" selected>Oct</option>
-                        <option value="11">Nov</option><option value="12">Dec</option>
-                    </select>
-                    <select id="logYearFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
-                        <option value="ALL">All Years</option>
-                        <option value="2025">2025</option>
-                        <option value="2026" selected>2026</option>
-                        <option value="2027">2027</option>
-                    </select>
-                    <button onclick="openManualAttendanceModal()" class="btn-warning" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Manual Entry</button>
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
+                        <button onclick="calculateSalarySheet()" class="btn-success" style="width:auto; padding:8px 16px;">⚡ Calculate Salaries</button>
+                        <label style="margin:0; font-weight:bold; margin-left: auto;">Format:</label>
+                        <select id="salaryExportFormat" style="width:auto; padding:8px;">
+                            <option value="excel">📥 Excel (CSV)</option><option value="pdf">📄 PDF</option>
+                        </select>
+                        <button onclick="handleSalaryExport()" class="btn-warning" style="width:auto; padding:8px 16px;">Export Salary</button>
+                    </div>
+                    
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>Staff Name</th><th>Base Salary</th><th>Present Days</th><th>Half Days</th><th>Effective Days</th><th>Net Earned</th></tr>
+                            </thead>
+                            <tbody id="salarySheetTable">
+                                <tr><td colspan="6">Click calculate.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            
-            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
-                <label style="margin:0; font-weight:bold;">Export Logs:</label>
-                <select id="exportFormatSelect" style="width:auto; padding:8px;">
-                    <option value="excel">📥 Excel (CSV)</option>
-                    <option value="pdf">📄 PDF Document</option>
-                </select>
-                <button onclick="handleExport()" class="btn-success" style="width:auto; padding:8px 16px;">Export Report</button>
-            </div>
-
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Punch Photo</th>
-                            <th>Date</th>
-                            <th>Staff Name</th>
-                            <th>Punch IN (IST)</th>
-                            <th>Punch OUT (IST)</th>
-                            <th>Work Hours</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminAttendanceTable">
-                        <tr><td colspan="8">Loading logs...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- BOX 5: SALARY CALCULATION SHEET -->
-        <div class="section printable-report">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
-            </div>
-
-            <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
-                <div class="form-group">
-                    <label>Select Month:</label>
-                    <select id="salMonth">
-                        <option value="01">Jan</option><option value="02">Feb</option>
-                        <option value="03">Mar</option><option value="04">Apr</option>
-                        <option value="05">May</option><option value="06">Jun</option>
-                        <option value="07">Jul</option><option value="08">Aug</option>
-                        <option value="09">Sep</option><option value="10" selected>Oct</option>
-                        <option value="11">Nov</option><option value="12">Dec</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Select Year:</label>
-                    <select id="salYear">
-                        <option value="2025">2025</option>
-                        <option value="2026" selected>2026</option>
-                        <option value="2027">2027</option>
-                    </select>
-                </div>
-            </div>
-
-            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
-                <button onclick="calculateSalarySheet()" class="btn-success" style="width:auto; padding:8px 16px;">⚡ Calculate Salaries</button>
-                <label style="margin:0; font-weight:bold; margin-left: auto;">Salary Export Format:</label>
-                <select id="salaryExportFormat" style="width:auto; padding:8px;">
-                    <option value="excel">📥 Excel (CSV)</option>
-                    <option value="pdf">📄 PDF Document</option>
-                </select>
-                <button onclick="handleSalaryExport()" class="btn-warning" style="width:auto; padding:8px 16px;">Export Salary</button>
-            </div>
-            
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Staff Name</th>
-                            <th>Base Monthly Salary</th>
-                            <th>Present Days</th>
-                            <th>Half Days</th>
-                            <th>Effective Days</th>
-                            <th>Net Earned Salary</th>
-                        </tr>
-                    </thead>
-                    <tbody id="salarySheetTable">
-                        <tr><td colspan="6">Select month/year and click calculate.</td></tr>
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
@@ -349,11 +337,24 @@
     <div class="modal-content">
         <h3>🔒 Admin Security Access</h3>
         <div class="form-group" style="margin-top:15px;">
-            <label>Enter Admin PIN Password:</label>
-            <input type="password" id="adminPinInput" placeholder="Enter PIN (Default: 1234)">
+            <label>Enter Admin Password:</label>
+            <input type="password" id="adminPinInput" placeholder="Enter Password">
         </div>
         <button onclick="verifyAdminLogin()" class="btn-success">Unlock Admin Panel</button>
         <button onclick="closeModal('loginModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
+    </div>
+</div>
+
+<!-- Modal: Change Admin Password -->
+<div id="adminPwdModal" class="modal">
+    <div class="modal-content">
+        <h3>🔑 Change Admin Password</h3>
+        <div class="form-group" style="margin-top:10px;">
+            <label>New Admin Password:</label>
+            <input type="password" id="newAdminPwdInput" placeholder="Enter new password">
+        </div>
+        <button onclick="saveNewAdminPassword()" class="btn-success">Update Password</button>
+        <button onclick="closeModal('adminPwdModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
 </div>
 
@@ -362,25 +363,13 @@
     <div class="modal-content">
         <h3>✏️ Edit Staff Directory Entry</h3>
         <input type="hidden" id="editStaffId">
-        <div class="form-group">
-            <label>Full Name:</label>
-            <input type="text" id="editName">
-        </div>
-        <div class="form-group">
-            <label>Phone Number:</label>
-            <input type="text" id="editPhone">
-        </div>
-        <div class="form-group">
-            <label>Monthly Salary (₹):</label>
-            <input type="number" id="editSalary">
-        </div>
-        <div class="form-group">
-            <label>Staff Attendance PIN:</label>
-            <input type="text" id="editPin">
-        </div>
+        <div class="form-group"><label>Full Name:</label><input type="text" id="editName"></div>
+        <div class="form-group"><label>Phone Number:</label><input type="text" id="editPhone"></div>
+        <div class="form-group"><label>Monthly Salary (₹):</label><input type="number" id="editSalary"></div>
+        <div class="form-group"><label>Staff Attendance PIN:</label><input type="text" id="editPin"></div>
 
         <div class="form-group" style="border:1px solid #334155; padding:8px; border-radius:6px; margin-top:8px;">
-            <label>Update Staff Photo:</label>
+            <label>Update Face Photo:</label>
             <input type="file" id="editPhotoInput" accept="image/*" onchange="handleEditPhotoSelect(event)">
             <span id="editPhotoBadge" style="display:none; color:#10b981; font-size:11px; font-weight:bold;">✅ New Photo Ready</span>
         </div>
@@ -401,20 +390,14 @@
     <div class="modal-content">
         <h3>⏰ Edit Punch Times</h3>
         <input type="hidden" id="editPunchId">
-        <div class="form-group">
-            <label>Punch IN Time (HH:MM):</label>
-            <input type="text" id="editPunchIn" placeholder="09:00">
-        </div>
-        <div class="form-group">
-            <label>Punch OUT Time (HH:MM):</label>
-            <input type="text" id="editPunchOut" placeholder="18:00">
-        </div>
+        <div class="form-group"><label>Punch IN Time:</label><input type="text" id="editPunchIn"></div>
+        <div class="form-group"><label>Punch OUT Time:</label><input type="text" id="editPunchOut"></div>
         <button onclick="savePunchTimeEdit()" class="btn-success">Update Punch Times</button>
         <button onclick="closeModal('editPunchModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
 </div>
 
-<!-- Modal: Image / Document Preview -->
+<!-- Modal: Preview -->
 <div id="previewModal" class="modal">
     <div class="modal-content" style="text-align:center; max-width:600px;">
         <h3 id="previewTitle">Preview</h3>
@@ -427,22 +410,9 @@
 <div id="manualModal" class="modal">
     <div class="modal-content">
         <h3>📝 Manual Attendance Override</h3>
-        <div class="form-group">
-            <label>Select Staff:</label>
-            <select id="manualStaffSelect"><option>Loading...</option></select>
-        </div>
-        <div class="form-group">
-            <label>Date:</label>
-            <input type="date" id="manualDate">
-        </div>
-        <div class="form-group">
-            <label>Status:</label>
-            <select id="manualStatus">
-                <option value="present">Present (Shift Completed)</option>
-                <option value="half_day">Half Day</option>
-                <option value="absent">Absent</option>
-            </select>
-        </div>
+        <div class="form-group"><label>Select Staff:</label><select id="manualStaffSelect"><option>Loading...</option></select></div>
+        <div class="form-group"><label>Date:</label><input type="date" id="manualDate"></div>
+        <div class="form-group"><label>Status:</label><select id="manualStatus"><option value="present">Present</option><option value="half_day">Half Day</option><option value="absent">Absent</option></select></div>
         <button onclick="saveManualAttendance()" class="btn-success">Save Record</button>
         <button onclick="closeModal('manualModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
@@ -482,11 +452,21 @@
 
     function captureRegCamera() {
         const canvas = document.createElement('canvas');
-        canvas.width = 300; canvas.height = 300;
-        canvas.getContext('2d').drawImage(regStaffCam, 0, 0, canvas.width, canvas.height);
-        registeredPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
+        canvas.width = 300; canvas.height = 360;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(regStaffCam, 0, 0, canvas.width, canvas.height);
+        registeredPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
         document.getElementById('photoBadge').style.display = 'inline';
-        alert('✅ Staff Photo Captured!');
+        alert('✅ Passport Face Photo Captured!');
+    }
+
+    // Switch Admin Tabs from Sidebar
+    function switchAdminTab(tabName, element) {
+        document.querySelectorAll('.admin-layout .section').forEach(sec => sec.classList.remove('active-section'));
+        document.querySelectorAll('.sidebar .menu-item').forEach(item => item.classList.remove('active'));
+
+        document.getElementById(`tab-${tabName}`).classList.add('active-section');
+        element.classList.add('active');
     }
 
     function toggleView() {
@@ -494,24 +474,54 @@
             document.getElementById('staffKioskSection').style.display = 'block';
             document.getElementById('adminSection').style.display = 'none';
             document.getElementById('toggleViewBtn').innerText = '🔑 Admin Login';
-            document.getElementById('viewSubtitle').innerText = 'PIN + Photo + GPS Verification Kiosk';
+            document.getElementById('viewSubtitle').innerText = 'PIN + Face Capture + GPS Verification Kiosk';
             isAdminLoggedIn = false;
         } else {
             document.getElementById('loginModal').style.display = 'flex';
         }
     }
 
-    function verifyAdminLogin() {
-        const pin = document.getElementById('adminPinInput').value;
-        if(pin === '1234') {
-            isAdminLoggedIn = true;
-            closeModal('loginModal');
-            document.getElementById('staffKioskSection').style.display = 'none';
-            document.getElementById('adminSection').style.display = 'block';
-            document.getElementById('toggleViewBtn').innerText = '📱 Staff Kiosk Mode';
-            document.getElementById('viewSubtitle').innerText = 'Admin Management Dashboard';
-            loadAdminData();
-        } else { alert('❌ Incorrect PIN!'); }
+    async function verifyAdminLogin() {
+        const password = document.getElementById('adminPinInput').value;
+        try {
+            const res = await fetch(`${API_URL}/admin/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json();
+            if(data.success) {
+                isAdminLoggedIn = true;
+                closeModal('loginModal');
+                document.getElementById('staffKioskSection').style.display = 'none';
+                document.getElementById('adminSection').style.display = 'block';
+                document.getElementById('toggleViewBtn').innerText = '📱 Staff Kiosk Mode';
+                document.getElementById('viewSubtitle').innerText = 'Admin Management Dashboard';
+                loadAdminData();
+            } else { alert('❌ Incorrect Password!'); }
+        } catch(e) { alert('Login error!'); }
+    }
+
+    function openAdminPwdModal() {
+        document.getElementById('newAdminPwdInput').value = '';
+        document.getElementById('adminPwdModal').style.display = 'flex';
+    }
+
+    async function saveNewAdminPassword() {
+        const newPassword = document.getElementById('newAdminPwdInput').value;
+        if(!newPassword) { alert('Enter new password!'); return; }
+        try {
+            const res = await fetch(`${API_URL}/admin/update-password`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newPassword })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert('Admin Password Updated Successfully!');
+                closeModal('adminPwdModal');
+            } else { alert('Error updating password'); }
+        } catch(e) { alert('Error!'); }
     }
 
     function logoutAdmin() {
@@ -519,7 +529,7 @@
         document.getElementById('adminSection').style.display = 'none';
         document.getElementById('staffKioskSection').style.display = 'block';
         document.getElementById('toggleViewBtn').innerText = '🔑 Admin Login';
-        document.getElementById('viewSubtitle').innerText = 'PIN + Photo + GPS Verification Kiosk';
+        document.getElementById('viewSubtitle').innerText = 'PIN + Face Capture + GPS Verification Kiosk';
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -560,7 +570,6 @@
         }
     }
 
-    // Geolocation with Fallback for Mobile Devices
     function captureAndSubmitPunch() {
         const pin = document.getElementById('staffPinInput').value;
         const statusBox = document.getElementById('punchStatusBox');
@@ -568,10 +577,10 @@
         if(!currentVerifiedStaff || !pin) { alert('Please enter valid PIN first!'); return; }
 
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 240; canvas.height = 240;
+        canvas.width = 240; canvas.height = 300;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
+        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
         statusBox.style.display = 'block';
         statusBox.innerHTML = '⏳ Fetching Location & Verifying Coordinates...';
@@ -605,19 +614,18 @@
                     sendPunchRequest(position.coords.latitude, position.coords.longitude);
                 }, 
                 function(error) {
-                    // Fallback option if mobile GPS blocks or fails
-                    let manualLat = prompt("GPS Location fetch nahi ho paayi! Kripya apne office ki Latitude dalein (e.g. 21.2514):", "21.2514");
-                    let manualLng = prompt("Kripya apne office ki Longitude dalein (e.g. 81.6296):", "81.6296");
+                    let manualLat = prompt("GPS location fetch nahi ho paayi! Office ki Latitude dalein:", "21.2514");
+                    let manualLng = prompt("Office ki Longitude dalein:", "81.6296");
                     if(manualLat && manualLng) {
                         sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
                     } else {
                         statusBox.innerHTML = '❌ Location Access Denied & Manual Entry Cancelled!';
                     }
                 }, 
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
-            let manualLat = prompt("Browser Geolocation Not Supported! Latitude dalein:", "21.2514");
+            let manualLat = prompt("Latitude dalein:", "21.2514");
             let manualLng = prompt("Longitude dalein:", "81.6296");
             if(manualLat && manualLng) {
                 sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
@@ -627,23 +635,15 @@
         }
     }
 
-    function compressAndConvertImage(file, callback) {
+    function compressAndConvertImage(file, callback, targetW=300, targetH=360) {
         const reader = new FileReader();
         reader.onload = function(event) {
             const img = new Image();
             img.onload = function() {
                 const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const maxDim = 500;
-                if (width > height) {
-                    if (width > maxDim) { height *= maxDim / width; width = maxDim; }
-                } else {
-                    if (height > maxDim) { width *= maxDim / height; height = maxDim; }
-                }
-                canvas.width = width; canvas.height = height;
-                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                callback(canvas.toDataURL('image/jpeg', 0.5));
+                canvas.width = targetW; canvas.height = targetH;
+                canvas.getContext('2d').drawImage(img, 0, 0, targetW, targetH);
+                callback(canvas.toDataURL('image/jpeg', 0.6));
             };
             img.src = event.target.result;
         };
@@ -667,7 +667,7 @@
                 compressAndConvertImage(file, function(base64) {
                     registeredDocBase64 = base64;
                     document.getElementById('docBadge').style.display = 'inline';
-                });
+                }, 600, 800);
             } else {
                 const reader = new FileReader();
                 reader.onload = function(evt) {
@@ -805,7 +805,7 @@
                     const isActive = staff.status !== 'inactive';
                     const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
                     const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
-                    const photoImg = staff.photo ? `<img src="${staff.photo}" class="thumb-img" onclick="openPreviewModal('Staff Photo', '${staff.photo}')">` : 'No Photo';
+                    const photoImg = staff.photo ? `<img src="${staff.photo}" class="thumb-img" onclick="openPreviewModal('Staff Face Photo', '${staff.photo}')">` : 'No Photo';
                     const docLink = staff.documentFile ? `<button onclick="openPreviewDocModal('${staff.name} Document', '${staff.documentFile}')" class="btn-warning" style="padding:4px 8px; font-size:11px;">📄 Preview Doc</button>` : 'No Doc';
 
                     tbody.innerHTML += `
@@ -830,7 +830,7 @@
 
     function openPreviewModal(title, imageSrc) {
         document.getElementById('previewTitle').innerText = title;
-        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:100%; border-radius:8px;">`;
+        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:200px; border-radius:50%; border:3px solid #38bdf8;">`;
         document.getElementById('previewModal').style.display = 'flex';
     }
 
@@ -911,7 +911,7 @@
             
             tbody.innerHTML = '';
             result.data.forEach(row => {
-                const photoThumb = row.punchPhoto ? `<img src="${row.punchPhoto}" class="thumb-img" onclick="openPreviewModal('Punch Captured Photo', '${row.punchPhoto}')">` : 'No Photo';
+                const photoThumb = row.punchPhoto ? `<img src="${row.punchPhoto}" class="thumb-img" onclick="openPreviewModal('Punch Face Photo', '${row.punchPhoto}')">` : 'No Photo';
                 tbody.innerHTML += `
                     <tr>
                         <td>${photoThumb}</td>
