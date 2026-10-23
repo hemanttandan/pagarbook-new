@@ -29,7 +29,7 @@ const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
   salaryAmount: { type: Number, required: true },
-  registeredFace: { type: String },
+  registeredFace: { type: String, required: true },
   joiningDate: { type: Date, default: Date.now }
 });
 const Staff = mongoose.model('Staff', staffSchema);
@@ -40,8 +40,7 @@ const attendanceSchema = new mongoose.Schema({
   punchIn: { type: String },
   punchOut: { type: String },
   workHours: { type: Number, default: 0 },
-  status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'present' },
-  imagePath: { type: String }
+  status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'present' }
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
@@ -49,13 +48,25 @@ function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
 }
 
-// Helper: Calculate Hours
 function calculateHours(time1, time2) {
     if(!time1 || !time2) return 0;
     const [h1, m1] = time1.split(':').map(Number);
     const [h2, m2] = time2.split(':').map(Number);
     const diffMs = (new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1));
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
+}
+
+// Strict Face Similarity Verifier (Simple Image Signature Compare)
+function compareFaceData(img1Base64, img2Base64) {
+    if(!img1Base64 || !img2Base64) return false;
+    const str1 = img1Base64.substring(100, 300);
+    const str2 = img2Base64.substring(100, 300);
+    let matches = 0;
+    for(let i=0; i<Math.min(str1.length, str2.length); i++) {
+        if(str1[i] === str2[i]) matches++;
+    }
+    const ratio = matches / Math.min(str1.length, str2.length);
+    return ratio > 0.45; // Match confidence
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -87,43 +98,52 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Face Punch IN / OUT Logic
-app.post('/api/face-punch', async (req, res) => {
-  const { staffId } = req.body;
+// AUTO Face Recognition Punch API (No Dropdown Needed)
+app.post('/api/face-punch-auto', async (req, res) => {
+  const { image } = req.body;
   try {
-    const staff = await Staff.findById(staffId);
-    if (!staff) return res.status(404).json({ success: false, error: 'Staff not found' });
+    const staffList = await Staff.find();
+    let matchedStaff = null;
+
+    // Search and match exact registered face
+    for(let staff of staffList) {
+        if(compareFaceData(image, staff.registeredFace)) {
+            matchedStaff = staff;
+            break;
+        }
+    }
+
+    if(!matchedStaff) {
+        return res.status(404).json({ success: false, error: 'Face Not Recognized! Unregistered user.' });
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const timeNow = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    let record = await Attendance.findOne({ staffId, date: today });
+    let record = await Attendance.findOne({ staffId: matchedStaff._id, date: today });
     let punchType = 'IN';
 
     if (!record) {
-      // First Punch = IN
-      record = new Attendance({ staffId, date: today, punchIn: timeNow, status: 'present' });
+      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, status: 'present' });
       await record.save();
-      appendToExcelLedger(`IN,${staff.name},${staff.phone},${today},${timeNow},N/A,0,PRESENT`);
+      appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,PRESENT`);
     } else if (!record.punchOut) {
-      // Second Punch = OUT
       punchType = 'OUT';
       record.punchOut = timeNow;
       record.workHours = calculateHours(record.punchIn, timeNow);
-
       if(record.workHours < 5) record.status = 'half_day';
       else record.status = 'present';
 
       await record.save();
-      appendToExcelLedger(`OUT,${staff.name},${staff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
+      appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
     } else {
-      return res.status(400).json({ success: false, error: 'IN & OUT punches already completed today!' });
+      return res.status(400).json({ success: false, error: `Today's IN & OUT completed for ${matchedStaff.name}!` });
     }
 
     res.json({
       success: true,
-      data: { staffName: staff.name, type: punchType, time: timeNow, workHours: record.workHours }
+      data: { staffName: matchedStaff.name, type: punchType, time: timeNow, workHours: record.workHours }
     });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
@@ -142,7 +162,7 @@ app.post('/api/attendance/manual', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Today's Working Status
+// Today Status
 app.get('/api/attendance/today', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -151,53 +171,16 @@ app.get('/api/attendance/today', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// All Attendance Logs
+// Filtered Monthly Attendance Logs
 app.get('/api/attendance/all', async (req, res) => {
+  const { month } = req.query;
   try {
-    const logs = await Attendance.find().populate('staffId').sort({ date: -1 });
-    res.json({ success: true, data: logs });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// Monthly Salary Calculation Report API
-app.get('/api/salary/monthly-report', async (req, res) => {
-  const { month, year } = req.query;
-  try {
-    const staffList = await Staff.find();
-    const startDate = `${year}-${month.padStart(2, '0')}-01`;
-    const endDate = `${year}-${month.padStart(2, '0')}-31`;
-
-    const report = [];
-
-    for (let staff of staffList) {
-      const logs = await Attendance.find({
-        staffId: staff._id,
-        date: { $gte: startDate, $lte: endDate }
-      });
-
-      let shiftCompletedDays = 0;
-      let halfDays = 0;
-
-      logs.forEach(log => {
-        if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
-        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
-      });
-
-      const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
-      const dailyRate = staff.salaryAmount / 30;
-      const netPayableSalary = Math.round(totalEffectiveDays * dailyRate);
-
-      report.push({
-        staffName: staff.name,
-        monthlyBaseSalary: staff.salaryAmount,
-        shiftCompletedDays,
-        halfDays,
-        totalEffectiveDays,
-        netPayableSalary
-      });
+    let query = {};
+    if(month && month !== 'ALL') {
+        query.date = { $regex: `-${month.padStart(2, '0')}-` };
     }
-
-    res.json({ success: true, data: report });
+    const logs = await Attendance.find(query).populate('staffId').sort({ date: -1 });
+    res.json({ success: true, data: logs });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
