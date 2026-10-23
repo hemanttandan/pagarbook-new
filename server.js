@@ -29,9 +29,8 @@ const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
   salaryAmount: { type: Number, required: true },
-  registeredFace: { type: String },
+  pin: { type: String, required: true, unique: true },
   documentFile: { type: String },
-  fingerprintId: { type: String },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   joiningDate: { type: Date, default: Date.now }
 });
@@ -42,10 +41,37 @@ const attendanceSchema = new mongoose.Schema({
   date: { type: String, required: true },
   punchIn: { type: String },
   punchOut: { type: String },
+  punchPhoto: { type: String },
   workHours: { type: Number, default: 0 },
   status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'present' }
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
+
+// ---------------- 📍 ALLOWED OFFICE LOCATIONS CONFIG ----------------
+const ALLOWED_LOCATIONS = [
+    { name: "Branch 1 (Office)", lat: 21.2514, lng: 81.6296, radiusKm: 0.1 }, // 100 Meter Radius
+    { name: "Branch 2 (Shop/Store)", lat: 21.2334, lng: 81.6337, radiusKm: 0.1 } // 100 Meter Radius
+];
+
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  var R = 6371;
+  var dLat = (lat2-lat1) * (Math.PI/180);
+  var dLon = (lon2-lon1) * (Math.PI/180); 
+  var a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; 
+}
+
+function isWithinAllowedLocations(userLat, userLng) {
+    for (let loc of ALLOWED_LOCATIONS) {
+        let dist = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
+        if (dist <= loc.radiusKm) return true;
+    }
+    return false;
+}
 
 function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
@@ -64,37 +90,12 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// Face Matcher
-function compareFaceData(liveImageBase64, registeredImageBase64) {
-    if (!liveImageBase64 || !registeredImageBase64) return false;
-    const cleanLive = liveImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
-    const cleanReg = registeredImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
-
-    const lenRatio = Math.min(cleanLive.length, cleanReg.length) / Math.max(cleanLive.length, cleanReg.length);
-    if (lenRatio < 0.4) return false;
-
-    let matches = 0;
-    const sampleSize = 40;
-    const step = Math.floor(cleanReg.length / sampleSize);
-    for (let i = 0; i < sampleSize; i++) {
-        const idx = i * step;
-        if (cleanLive[idx] === cleanReg[idx]) matches++;
-    }
-    return (matches / sampleSize) >= 0.10;
-}
-
 // ---------------- API ENDPOINTS ----------------
 
 app.post('/api/staff', async (req, res) => {
   try {
-    const { name, phone, salaryAmount, faceImage, documentFile, fingerprintId } = req.body;
-    const staff = new Staff({ 
-        name, phone, salaryAmount, 
-        registeredFace: faceImage, 
-        documentFile, 
-        fingerprintId, 
-        status: 'active' 
-    });
+    const { name, phone, salaryAmount, pin, documentFile } = req.body;
+    const staff = new Staff({ name, phone, salaryAmount, pin, documentFile, status: 'active' });
     await staff.save();
     res.status(201).json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
@@ -109,12 +110,8 @@ app.get('/api/staff', async (req, res) => {
 
 app.put('/api/staff/:id', async (req, res) => {
   try {
-    const { name, phone, salaryAmount, registeredFace, fingerprintId } = req.body;
-    const updateObj = { name, phone, salaryAmount };
-    if (registeredFace) updateObj.registeredFace = registeredFace;
-    if (fingerprintId) updateObj.fingerprintId = fingerprintId;
-
-    const staff = await Staff.findByIdAndUpdate(req.params.id, updateObj, { new: true });
+    const { name, phone, salaryAmount, pin } = req.body;
+    const staff = await Staff.findByIdAndUpdate(req.params.id, { name, phone, salaryAmount, pin }, { new: true });
     res.json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
@@ -135,67 +132,34 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Auto Face Recognition Punch
-app.post('/api/face-punch-auto', async (req, res) => {
-  const { image } = req.body;
+// ⚡ Step 1 PIN Verification Endpoint
+app.post('/api/verify-pin', async (req, res) => {
+  const { pin } = req.body;
   try {
-    const activeStaffList = await Staff.find({ status: 'active' });
-    let matchedStaff = null;
-
-    for (let staff of activeStaffList) {
-        if (compareFaceData(image, staff.registeredFace)) {
-            matchedStaff = staff;
-            break;
-        }
-    }
-
+    const matchedStaff = await Staff.findOne({ pin, status: 'active' });
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Face Not Recognized!' });
+        return res.status(404).json({ success: false, error: 'Incorrect PIN or Staff Inactive!' });
     }
-
-    const today = new Date().toISOString().split('T')[0];
-    const timeNow = getLocalCurrentTime();
-
-    let record = await Attendance.findOne({ staffId: matchedStaff._id, date: today });
-    let punchType = 'IN';
-
-    if (!record) {
-      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, status: 'present' });
-      await record.save();
-      appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,PRESENT`);
-    } else if (!record.punchOut) {
-      punchType = 'OUT';
-      record.punchOut = timeNow;
-      record.workHours = calculateHours(record.punchIn, timeNow);
-      if (record.workHours < 5) record.status = 'half_day';
-      else record.status = 'present';
-
-      await record.save();
-      appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
-    } else {
-      return res.status(400).json({ success: false, error: `Today's IN & OUT completed!` });
-    }
-
-    res.json({
-      success: true,
-      data: { staffName: matchedStaff.name, type: punchType, time: timeNow, workHours: record.workHours }
-    });
+    res.json({ success: true, data: { name: matchedStaff.name, phone: matchedStaff.phone } });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Mobile Fingerprint Sensor Hardware Match
-app.post('/api/finger-punch-auto', async (req, res) => {
-  const { fingerId } = req.body;
+// ⚡ Step 2 & 3: Submit Captured Photo + GPS Location Punch Endpoint
+app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
+  const { pin, lat, lng, photo } = req.body;
   try {
-    const activeStaffList = await Staff.find({ status: 'active' });
-    
-    let matchedStaff = activeStaffList.find(s => s.fingerprintId && s.fingerprintId === fingerId);
-    if (!matchedStaff && activeStaffList.length > 0) {
-        matchedStaff = activeStaffList[0];
+    // 1. Verify GPS Radius First
+    if (!lat || !lng || !isWithinAllowedLocations(lat, lng)) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Punch Rejected! You are outside allowed office location!' 
+        });
     }
 
+    // 2. Match PIN & Active Status
+    const matchedStaff = await Staff.findOne({ pin, status: 'active' });
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'No Active Staff Found!' });
+        return res.status(404).json({ success: false, error: 'Incorrect PIN or Staff Inactive!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -205,7 +169,7 @@ app.post('/api/finger-punch-auto', async (req, res) => {
     let punchType = 'IN';
 
     if (!record) {
-      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, status: 'present' });
+      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, punchPhoto: photo, status: 'present' });
       await record.save();
       appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,PRESENT`);
     } else if (!record.punchOut) {

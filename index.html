@@ -38,9 +38,8 @@
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; text-align: left; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; text-align: left; }
         
-        .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
         @media print {
@@ -58,7 +57,7 @@
     <header class="no-print">
         <div>
             <h1>📱 Attendance App</h1>
-            <small style="color:#94a3b8;" id="viewSubtitle">Staff Kiosk Terminal</small>
+            <small style="color:#94a3b8;" id="viewSubtitle">PIN + Photo + GPS Verification Kiosk</small>
         </div>
         <div>
             <button class="nav-btn" id="toggleViewBtn" onclick="toggleView()">🔑 Admin Login</button>
@@ -69,20 +68,32 @@
     <div id="staffKioskSection">
         <div class="grid-2">
             <div class="section">
-                <h3>📸 Auto Face / 👆 Mobile Finger Sensor</h3>
-                <p style="font-size:12px; color:#94a3b8;">Face Scan karein ya Mobile Sensor par Finger Touch karein</p>
-                <video id="kioskVideo" autoplay playsinline></video>
-                <div style="display:flex; gap:10px; margin-top:12px;">
-                    <button onclick="autoScanAndPunch()" class="btn-success">📸 Face Auto Scan</button>
-                    <button onclick="triggerInDisplayFingerSensor()" class="btn-warning">👆 Touch Finger Punch</button>
+                <h3>🔢 Step 1: Enter Staff PIN</h3>
+                
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Enter 4-Digit PIN:</label>
+                    <input type="password" id="staffPinInput" placeholder="Enter PIN" style="font-size: 20px; text-align: center; letter-spacing: 5px;" oninput="verifyPinAndShowName()">
                 </div>
+
+                <div id="staffNameDisplayBox" style="display:none; text-align:center; background:#0f172a; padding:10px; border-radius:8px; border:1px solid #10b981; margin-bottom:12px;">
+                    <small style="color:#94a3b8;">Welcome Staff Member:</small>
+                    <h2 id="verifiedStaffName" style="color:#34d399; margin:4px 0;">-</h2>
+                </div>
+
+                <!-- Step 2: Camera Stream (Visible only after valid PIN) -->
+                <div id="cameraStepBox" style="display:none;">
+                    <h3>📸 Step 2: Capture Live Photo</h3>
+                    <video id="kioskVideo" autoplay playsinline></video>
+                    <button onclick="captureAndSubmitPunch()" class="btn-success" style="padding:12px; font-size:16px; margin-top:10px;">📷 Capture Photo & Submit Punch</button>
+                </div>
+
                 <div id="punchStatusBox" class="status-box" style="display:none;"></div>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
             </div>
 
             <div class="section">
                 <h3>🟢 Working Staff Status (Today)</h3>
-                <div style="max-height: 300px; overflow-y: auto;">
+                <div style="max-height: 320px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -127,26 +138,20 @@
                         <label>Monthly Salary (₹):</label>
                         <input type="number" id="regSalary" placeholder="Enter salary">
                     </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>Staff 4-Digit Attendance PIN:</label>
+                        <input type="text" id="regPin" placeholder="Example: 1234">
+                    </div>
                     <div class="form-group">
                         <label>Attach Staff Document (Aadhaar/PAN/PDF):</label>
                         <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleDocSelect(event)">
                         <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Document Attached</span>
                     </div>
                 </div>
-                <div>
-                    <div class="form-group">
-                        <label>Capture Staff Face Image:</label>
-                        <video id="regVideo" autoplay playsinline style="max-height:100px;"></video>
-                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:4px; padding:6px;">📷 Capture Face</button>
-                    </div>
-                    <div class="form-group">
-                        <label>Scan & Bind Fingerprint Sensor:</label>
-                        <button type="button" onclick="registerMobileFingerprint()" class="btn-success">👆 Scan Mobile Finger</button>
-                        <span id="fingerBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Finger Registered</span>
-                    </div>
-                </div>
             </div>
-            <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Complete Staff Profile</button>
+            <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Profile</button>
         </div>
 
         <!-- Form 2: Registered Staff Directory -->
@@ -156,7 +161,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Face</th>
+                            <th>PIN</th>
                             <th>Name</th>
                             <th>Phone</th>
                             <th>Salary</th>
@@ -225,7 +230,7 @@
             </div>
         </div>
 
-        <!-- Form 4: Salary Calculation Sheet -->
+        <!-- Form 4: Salary Sheet -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
@@ -297,10 +302,10 @@
     </div>
 </div>
 
-<!-- Modal: Edit Staff Details (With Face & Finger Update) -->
+<!-- Modal: Edit Staff -->
 <div id="editStaffModal" class="modal">
     <div class="modal-content">
-        <h3>✏️ Edit Staff, Face & Fingerprint</h3>
+        <h3>✏️ Edit Staff Details & PIN</h3>
         <input type="hidden" id="editStaffId">
         <div class="form-group">
             <label>Full Name:</label>
@@ -314,17 +319,9 @@
             <label>Monthly Salary (₹):</label>
             <input type="number" id="editSalary">
         </div>
-        
-        <div class="form-group" style="border:1px solid #334155; padding:10px; border-radius:6px; margin-top:10px;">
-            <label>Update Face Photo:</label>
-            <button type="button" onclick="captureEditLiveFace()" class="btn-warning" style="padding:6px; font-size:12px;">📸 Capture New Face Image</button>
-            <span id="editFaceBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold; margin-top:4px; display:block;">✅ New Face Captured!</span>
-        </div>
-
-        <div class="form-group" style="border:1px solid #334155; padding:10px; border-radius:6px; margin-top:10px;">
-            <label>Update Mobile Fingerprint:</label>
-            <button type="button" onclick="scanEditFingerprint()" class="btn-success" style="padding:6px; font-size:12px;">👆 Re-Scan Mobile Finger</button>
-            <span id="editFingerBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold; margin-top:4px; display:block;">✅ New Finger Token Updated!</span>
+        <div class="form-group">
+            <label>Staff Attendance PIN:</label>
+            <input type="text" id="editPin">
         </div>
 
         <button onclick="updateStaffDetails()" class="btn-success" style="margin-top:10px;">Save Updated Profile</button>
@@ -378,23 +375,16 @@
 <script>
     const API_URL = '/api';
     let isAdminLoggedIn = false;
-    let registeredFaceBase64 = '';
     let registeredDocBase64 = '';
-    let registeredFingerId = '';
-    let editUpdatedFaceBase64 = '';
-    let editUpdatedFingerId = '';
+    let currentVerifiedStaff = null;
     let cachedStaffList = [];
 
     const kioskVideo = document.getElementById('kioskVideo');
-    const regVideo = document.getElementById('regVideo');
 
     function initCameras() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-                .then(stream => {
-                    kioskVideo.srcObject = stream;
-                    regVideo.srcObject = stream;
-                })
+                .then(stream => { kioskVideo.srcObject = stream; })
                 .catch(err => console.warn("Camera access needed!"));
         }
     }
@@ -404,7 +394,7 @@
             document.getElementById('staffKioskSection').style.display = 'block';
             document.getElementById('adminSection').style.display = 'none';
             document.getElementById('toggleViewBtn').innerText = '🔑 Admin Login';
-            document.getElementById('viewSubtitle').innerText = 'Staff Kiosk Terminal';
+            document.getElementById('viewSubtitle').innerText = 'PIN + Photo + GPS Verification Kiosk';
             isAdminLoggedIn = false;
         } else {
             document.getElementById('loginModal').style.display = 'flex';
@@ -429,111 +419,104 @@
         document.getElementById('adminSection').style.display = 'none';
         document.getElementById('staffKioskSection').style.display = 'block';
         document.getElementById('toggleViewBtn').innerText = '🔑 Admin Login';
-        document.getElementById('viewSubtitle').innerText = 'Staff Kiosk Terminal';
+        document.getElementById('viewSubtitle').innerText = 'PIN + Photo + GPS Verification Kiosk';
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    async function autoScanAndPunch() {
+    // Step 1: Verify PIN & Display Staff Name
+    async function verifyPinAndShowName() {
+        const pin = document.getElementById('staffPinInput').value;
+        const nameBox = document.getElementById('staffNameDisplayBox');
+        const cameraBox = document.getElementById('cameraStepBox');
+        const nameText = document.getElementById('verifiedStaffName');
+        const statusBox = document.getElementById('punchStatusBox');
+
+        if(pin.length >= 4) {
+            try {
+                const res = await fetch(`${API_URL}/verify-pin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin })
+                });
+                const result = await res.json();
+                if(result.success) {
+                    currentVerifiedStaff = result.data;
+                    nameText.innerText = result.data.name;
+                    nameBox.style.display = 'block';
+                    cameraBox.style.display = 'block';
+                    statusBox.style.display = 'none';
+                    initCameras();
+                } else {
+                    nameBox.style.display = 'none';
+                    cameraBox.style.display = 'none';
+                    statusBox.style.display = 'block';
+                    statusBox.innerHTML = `❌ ${result.error}`;
+                }
+            } catch(e) { console.log(e); }
+        } else {
+            nameBox.style.display = 'none';
+            cameraBox.style.display = 'none';
+            statusBox.style.display = 'none';
+        }
+    }
+
+    // Step 2 & 3: Capture Photo + Get GPS + Submit Punch
+    function captureAndSubmitPunch() {
+        const pin = document.getElementById('staffPinInput').value;
+        const statusBox = document.getElementById('punchStatusBox');
+
+        if(!currentVerifiedStaff || !pin) { alert('Please enter valid PIN first!'); return; }
+
+        // Capture Canvas Live Photo
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 120; canvas.height = 120;
+        canvas.width = 160; canvas.height = 160;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-        const statusBox = document.getElementById('punchStatusBox');
         statusBox.style.display = 'block';
-        statusBox.innerHTML = '⏳ Matching face profile...';
+        statusBox.innerHTML = '⏳ Fetching Location & Verifying Coordinates...';
 
-        try {
-            const res = await fetch(`${API_URL}/face-punch-auto`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: imageBase64 })
-            });
-            const result = await res.json();
-            if(result.success) {
-                statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
-                loadTodayWorkingStatus();
-            } else {
-                statusBox.innerHTML = `❌ ${result.error}`;
-            }
-        } catch(err) { statusBox.innerHTML = '❌ Face match failed!'; }
-    }
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(async function(position) {
+                const userLat = position.coords.latitude;
+                const userLng = position.coords.longitude;
 
-    async function triggerInDisplayFingerSensor() {
-        const statusBox = document.getElementById('punchStatusBox');
-        statusBox.style.display = 'block';
-        statusBox.innerHTML = '⏳ Scanning Fingerprint... Touch Phone Sensor';
+                try {
+                    const res = await fetch(`${API_URL}/submit-photo-geofenced-punch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            pin, 
+                            lat: userLat, 
+                            lng: userLng,
+                            photo: capturedPhotoBase64
+                        })
+                    });
+                    const result = await res.json();
+                    if(result.success) {
+                        statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
+                        
+                        // Reset Inputs
+                        document.getElementById('staffPinInput').value = '';
+                        document.getElementById('staffNameDisplayBox').style.display = 'none';
+                        document.getElementById('cameraStepBox').style.display = 'none';
+                        currentVerifiedStaff = null;
 
-        let hardwareKey = 'MOBILE_SENSOR_TOKEN';
-
-        if (window.PublicKeyCredential) {
-            try {
-                const credential = await navigator.credentials.get({
-                    publicKey: {
-                        challenge: new Uint8Array(32),
-                        timeout: 30000,
-                        userVerification: "required",
-                        authenticatorSelection: { authenticatorAttachment: "platform" }
+                        loadTodayWorkingStatus();
+                    } else {
+                        statusBox.innerHTML = `❌ ${result.error}`;
                     }
-                });
-                if (credential) hardwareKey = credential.id;
-            } catch (e) {}
+                } catch(err) {
+                    statusBox.innerHTML = '❌ Server Error!';
+                }
+            }, function(error) {
+                statusBox.innerHTML = '❌ Location Access Denied! Please Turn On GPS/Location on Phone.';
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        } else {
+            statusBox.innerHTML = '❌ Geolocation Not Supported by Browser!';
         }
-
-        try {
-            const res = await fetch(`${API_URL}/finger-punch-auto`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fingerId: hardwareKey })
-            });
-            const result = await res.json();
-            if(result.success) {
-                statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">FINGER PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
-                loadTodayWorkingStatus();
-            } else {
-                statusBox.innerHTML = `❌ ${result.error}`;
-            }
-        } catch(err) {
-            statusBox.innerHTML = '❌ Fingerprint Sensor error!';
-        }
-    }
-
-    function captureLiveFace() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 120; canvas.height = 120;
-        canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
-        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
-        alert('✅ Face captured!');
-    }
-
-    function captureEditLiveFace() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 120; canvas.height = 120;
-        canvas.getContext('2d').drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        editUpdatedFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
-        document.getElementById('editFaceBadge').style.display = 'block';
-    }
-
-    async function scanEditFingerprint() {
-        editUpdatedFingerId = 'FINGER_' + Date.now();
-        if (window.PublicKeyCredential) {
-            try {
-                const cred = await navigator.credentials.create({
-                    publicKey: {
-                        challenge: new Uint8Array(32),
-                        rp: { name: "Attendance App" },
-                        user: { id: new Uint8Array(16), name: "staff_edit", displayName: "Staff Edit" },
-                        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                        authenticatorSelection: { authenticatorAttachment: "platform" },
-                        timeout: 30000
-                    }
-                });
-                if (cred) editUpdatedFingerId = cred.id;
-            } catch(e) {}
-        }
-        document.getElementById('editFingerBadge').style.display = 'block';
     }
 
     function handleDocSelect(e) {
@@ -548,34 +531,14 @@
         }
     }
 
-    async function registerMobileFingerprint() {
-        registeredFingerId = 'FINGER_' + Date.now();
-        if (window.PublicKeyCredential) {
-            try {
-                const cred = await navigator.credentials.create({
-                    publicKey: {
-                        challenge: new Uint8Array(32),
-                        rp: { name: "Attendance App" },
-                        user: { id: new Uint8Array(16), name: "staff", displayName: "Staff" },
-                        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                        authenticatorSelection: { authenticatorAttachment: "platform" },
-                        timeout: 30000
-                    }
-                });
-                if (cred) registeredFingerId = cred.id;
-            } catch(e) {}
-        }
-        document.getElementById('fingerBadge').style.display = 'inline';
-        alert('✅ Mobile Fingerprint Registered!');
-    }
-
     async function saveRegisteredStaff() {
         const name = document.getElementById('regName').value;
         const phone = document.getElementById('regPhone').value;
         const salaryAmount = document.getElementById('regSalary').value;
+        const pin = document.getElementById('regPin').value;
 
-        if(!name || !phone || !salaryAmount) {
-            alert('Please fill name, phone and salary details!');
+        if(!name || !phone || !salaryAmount || !pin) {
+            alert('Please fill Name, Phone, Salary AND 4-Digit PIN!');
             return;
         }
 
@@ -584,10 +547,8 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    name, phone, salaryAmount, 
-                    faceImage: registeredFaceBase64 || 'https://via.placeholder.com/100',
-                    documentFile: registeredDocBase64 || '',
-                    fingerprintId: registeredFingerId || 'FINGER_' + Date.now()
+                    name, phone, salaryAmount, pin,
+                    documentFile: registeredDocBase64 || ''
                 })
             });
             const data = await res.json();
@@ -596,9 +557,9 @@
                 document.getElementById('regName').value = '';
                 document.getElementById('regPhone').value = '';
                 document.getElementById('regSalary').value = '';
+                document.getElementById('regPin').value = '';
                 document.getElementById('docBadge').style.display = 'none';
-                document.getElementById('fingerBadge').style.display = 'none';
-                registeredFaceBase64 = ''; registeredDocBase64 = ''; registeredFingerId = '';
+                registeredDocBase64 = '';
                 loadAdminData();
             } else { alert('Error: ' + data.error); }
         } catch(err) { alert('Registration failed!'); }
@@ -620,7 +581,6 @@
                 
                 tbody.innerHTML = '';
                 result.data.forEach(staff => {
-                    const faceSrc = staff.registeredFace || 'https://via.placeholder.com/45';
                     const isActive = staff.status !== 'inactive';
                     const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
                     const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
@@ -628,14 +588,14 @@
 
                     tbody.innerHTML += `
                         <tr>
-                            <td><img src="${faceSrc}" class="face-img-thumb" alt="face"></td>
+                            <td><strong style="color:#38bdf8;">${staff.pin || 'N/A'}</strong></td>
                             <td><strong>${staff.name}</strong></td>
                             <td>${staff.phone}</td>
                             <td>₹${staff.salaryAmount}</td>
                             <td>${docLink}</td>
                             <td><span class="badge ${statusBadgeClass}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${statusText}</span></td>
                             <td>
-                                <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount})" class="btn-warning" style="padding:4px 8px; font-size:12px; margin-bottom:4px;">Edit</button>
+                                <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount}, '${staff.pin || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px; margin-bottom:4px;">Edit</button>
                                 <button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button>
                             </td>
                         </tr>
@@ -645,15 +605,12 @@
         } catch(err) { tbody.innerHTML = '<tr><td colspan="7">Error loading directory.</td></tr>'; }
     }
 
-    function openEditStaff(id, name, phone, salary) {
+    function openEditStaff(id, name, phone, salary, pin) {
         document.getElementById('editStaffId').value = id;
         document.getElementById('editName').value = name;
         document.getElementById('editPhone').value = phone;
         document.getElementById('editSalary').value = salary;
-        document.getElementById('editFaceBadge').style.display = 'none';
-        document.getElementById('editFingerBadge').style.display = 'none';
-        editUpdatedFaceBase64 = '';
-        editUpdatedFingerId = '';
+        document.getElementById('editPin').value = pin;
         document.getElementById('editStaffModal').style.display = 'flex';
     }
 
@@ -662,20 +619,17 @@
         const name = document.getElementById('editName').value;
         const phone = document.getElementById('editPhone').value;
         const salaryAmount = document.getElementById('editSalary').value;
-
-        const payload = { name, phone, salaryAmount };
-        if (editUpdatedFaceBase64) payload.registeredFace = editUpdatedFaceBase64;
-        if (editUpdatedFingerId) payload.fingerprintId = editUpdatedFingerId;
+        const pin = document.getElementById('editPin').value;
 
         try {
             const res = await fetch(`${API_URL}/staff/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ name, phone, salaryAmount, pin })
             });
             const data = await res.json();
             if(data.success) {
-                alert('Staff Details, Face & Fingerprint updated!');
+                alert('Staff Details & PIN updated!');
                 closeModal('editStaffModal');
                 loadStaffDirectory();
             } else { alert('Error: ' + data.error); }
@@ -846,7 +800,6 @@
         }
     }
 
-    initCameras();
     loadTodayWorkingStatus();
 </script>
 
