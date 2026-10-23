@@ -1,0 +1,224 @@
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PagarBook Lens - Face Attendance & Payroll App</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a2e; color: #fff; margin: 0; padding: 15px; }
+        .container { max-width: 600px; margin: auto; background: #16213e; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2, h3 { color: #00fff5; text-align: center; margin-top: 5px; }
+        .drive-badge { font-size: 11px; background: #0f3460; padding: 6px 10px; border-radius: 6px; color: #e94560; text-align: center; margin-bottom: 15px; border: 1px solid #e94560; }
+        .section { background: #0f3460; margin-bottom: 20px; padding: 15px; border-radius: 10px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #e94560; }
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #00fff5; border-radius: 6px; background: #16213e; color: #fff; }
+        button { background-color: #00fff5; color: #16213e; padding: 12px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: #e94560; color: #fff; }
+        video { width: 100%; max-height: 250px; background: #000; border-radius: 8px; border: 2px solid #00fff5; object-fit: cover; }
+        .staff-card { background: #16213e; padding: 12px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #00fff5; }
+        .status-msg { text-align: center; font-weight: bold; padding: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📷 PagarBook Lens</h2>
+    <div class="drive-badge">
+        📂 Excel Drive Path: 1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0<br>
+        🖼️ Photos Drive Path: 1RoAc06fNeO7HqGCVuyqfCFIOUhHf3bUG
+    </div>
+
+    <!-- 1. Lens Camera Face Scanner -->
+    <div class="section">
+        <h3>Lens Face Scanner Punch</h3>
+        <video id="video" autoplay playsinline></video>
+        <div class="form-group" style="margin-top: 10px;">
+            <label>Select Staff for Face Scan:</label>
+            <select id="faceStaffSelect"><option>Loading staff...</option></select>
+        </div>
+        <button onclick="scanAndPunchFace()" style="background-color: #e94560; color: #fff;">📸 Scan Face & Punch Attendance</button>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <!-- 2. Add New Staff -->
+    <div class="section">
+        <h3>Add New Staff Master</h3>
+        <div class="form-group">
+            <label>Staff Full Name:</label>
+            <input type="text" id="name" placeholder="Enter staff name">
+        </div>
+        <div class="form-group">
+            <label>Phone Number:</label>
+            <input type="text" id="phone" placeholder="Enter phone number">
+        </div>
+        <div class="form-group">
+            <label>Salary Type:</label>
+            <select id="salaryType">
+                <option value="monthly">Monthly</option>
+                <option value="daily">Daily</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Salary Amount (₹):</label>
+            <input type="number" id="salaryAmount" placeholder="Enter salary amount">
+        </div>
+        <button onclick="addNewStaff()">Register Staff to Drive</button>
+    </div>
+
+    <!-- 3. Staff Records & Salary Sheet -->
+    <div class="section">
+        <h3>Staff Master & Salary Ledger</h3>
+        <div id="staffContainer" class="status-msg">Connecting to server...</div>
+    </div>
+</div>
+
+<script>
+    const API_URL = '/api';
+
+    // Camera Init for Lens
+    const video = document.getElementById('video');
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { console.warn("Camera permission required for PagarBook Lens!"); });
+    }
+
+    // Load Staff Master List
+    async function loadStaffList() {
+        const container = document.getElementById('staffContainer');
+        const selectDropdown = document.getElementById('faceStaffSelect');
+
+        try {
+            const res = await fetch(`${API_URL}/staff`);
+            const result = await res.json();
+
+            if(!result.data || result.data.length === 0) {
+                container.innerHTML = '<p>No staff registered yet.</p>';
+                selectDropdown.innerHTML = '<option value="">No staff available</option>';
+                return;
+            }
+
+            container.innerHTML = '';
+            selectDropdown.innerHTML = '';
+
+            result.data.forEach(staff => {
+                selectDropdown.innerHTML += `<option value="${staff._id}">${staff.name} (${staff.phone})</option>`;
+
+                container.innerHTML += `
+                    <div class="staff-card">
+                        <div>
+                            <strong>${staff.name}</strong><br>
+                            <small>📞 ${staff.phone} | ₹${staff.salaryAmount} (${staff.salaryType})</small>
+                        </div>
+                        <button onclick="viewSalarySheet('${staff._id}')" style="width: auto; padding: 6px 12px; font-size: 12px; background: #00fff5; color: #16213e;">Salary Sheet</button>
+                    </div>
+                `;
+            });
+        } catch (err) {
+            container.innerHTML = '<p style="color:#e94560;">❌ Server Connection Error! Ensure server is running.</p>';
+        }
+    }
+
+    // Add Staff Function
+    async function addNewStaff() {
+        const name = document.getElementById('name').value;
+        const phone = document.getElementById('phone').value;
+        const salaryType = document.getElementById('salaryType').value;
+        const salaryAmount = document.getElementById('salaryAmount').value;
+
+        if(!name || !phone || !salaryAmount) {
+            alert('Please fill all fields!');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/staff`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone, salaryType, salaryAmount })
+            });
+
+            const data = await res.json();
+            if(data.success) {
+                alert('Staff added & registered to Drive!');
+                document.getElementById('name').value = '';
+                document.getElementById('phone').value = '';
+                document.getElementById('salaryAmount').value = '';
+                loadStaffList();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        } catch (err) {
+            alert('Server error while adding staff!');
+        }
+    }
+
+    // Face Scan & Punch Function
+    async function scanAndPunchFace() {
+        const staffId = document.getElementById('faceStaffSelect').value;
+        if(!staffId || staffId === 'No staff available') {
+            alert('Please select a valid staff member!');
+            return;
+        }
+
+        const canvas = document.getElementById('canvas');
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageBase64 = canvas.toDataURL('image/png');
+
+        try {
+            const res = await fetch(`${API_URL}/face-punch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ staffId, image: imageBase64 })
+            });
+
+            const result = await res.json();
+            if(result.success) {
+                alert('✅ Face Scan Punch Successful! Photo synced to Drive.');
+            } else {
+                alert('Punch Failed: ' + result.error);
+            }
+        } catch (err) {
+            alert('Error recording face punch attendance!');
+        }
+    }
+
+    // View Salary Calculation
+    async function viewSalarySheet(staffId) {
+        const month = prompt("Enter Month Number (e.g. 10 for October):", "10");
+        const year = prompt("Enter Year (e.g. 2026):", "2026");
+
+        if(!month || !year) return;
+
+        try {
+            const res = await fetch(`${API_URL}/salary/calculate?staffId=${staffId}&month=${month}&year=${year}`);
+            const result = await res.json();
+
+            if(result.success) {
+                const d = result.data;
+                alert(`--- PagarBook Salary Sheet ---
+Staff Name: ${d.staffName}
+Monthly Base Salary: ₹${d.monthlyBaseSalary}
+Total Present Days: ${d.presentDays}
+Half Days: ${d.halfDays}
+Effective Working Days: ${d.totalEffectiveDays}
+Net Payable Earned Salary: ₹${d.totalEarnedSalary}`);
+            } else {
+                alert('Error calculating salary sheet');
+            }
+        } catch (err) {
+            alert('Error calculating salary sheet!');
+        }
+    }
+
+    // Run on Page Load
+    loadStaffList();
+</script>
+
+</body>
+</html>
