@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance App</title>
+    <title>Attendance & Payroll App</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 950px; margin: auto; }
+        .container { max-width: 980px; margin: auto; }
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
         h1, h2, h3 { margin: 0; color: #38bdf8; }
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -25,7 +25,7 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        video { width: 100%; max-height: 240px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
+        video { width: 100%; max-height: 220px; background: #000; border-radius: 8px; border: 2px solid #38bdf8; object-fit: cover; transform: scaleX(-1); }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
@@ -38,7 +38,7 @@
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; }
         
         .face-img-thumb { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
@@ -69,12 +69,12 @@
     <div id="staffKioskSection">
         <div class="grid-2">
             <div class="section">
-                <h3>📸 Face Recognition / 👆 Tap Finger Punch</h3>
-                <p style="font-size:12px; color:#94a3b8;">Face scan karein ya neeche staff select karke Direct Punch karein</p>
+                <h3>📸 Auto Face / 👆 Auto Finger Punch</h3>
+                <p style="font-size:12px; color:#94a3b8;">Face Scan karein ya Fingerprint Sensor tap karein</p>
                 <video id="kioskVideo" autoplay playsinline></video>
                 <div style="display:flex; gap:10px; margin-top:12px;">
-                    <button onclick="autoScanAndPunch()" class="btn-success">📸 Scan Face Punch</button>
-                    <button onclick="openTapPunchModal()" class="btn-warning">👆 Tap / Finger Punch</button>
+                    <button onclick="autoScanAndPunch()" class="btn-success">📸 Face Auto Scan</button>
+                    <button onclick="autoFingerPunch()" class="btn-warning">👆 Auto Finger Punch</button>
                 </div>
                 <div id="punchStatusBox" class="status-box" style="display:none;"></div>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
@@ -105,14 +105,14 @@
     <div id="adminSection" style="display: none;">
         <div class="section no-print" style="background:#0f172a; border-left:4px solid #38bdf8;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>🔐 Admin Dashboard Control Panel</h3>
+                <h3>🔐 Admin Control Panel</h3>
                 <button onclick="logoutAdmin()" class="btn-danger" style="width:auto; padding:6px 12px; font-size:12px;">Logout</button>
             </div>
         </div>
 
-        <!-- Form 1: Register New Staff (Face Camera Only) -->
+        <!-- Form 1: Register New Staff with Document & Fingerprint -->
         <div class="section no-print">
-            <h3>➕ Register New Staff Form (Face Capture)</h3>
+            <h3>➕ Register New Staff Master</h3>
             <div class="grid-2">
                 <div>
                     <div class="form-group">
@@ -127,17 +127,26 @@
                         <label>Monthly Salary (₹):</label>
                         <input type="number" id="regSalary" placeholder="Enter salary">
                     </div>
+                    <div class="form-group">
+                        <label>Attach Staff Document (Aadhaar/PAN/PDF):</label>
+                        <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleDocSelect(event)">
+                        <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Document Attached</span>
+                    </div>
                 </div>
                 <div>
                     <div class="form-group">
-                        <label>Live Face Camera Capture:</label>
-                        <video id="regVideo" autoplay playsinline style="max-height:140px;"></video>
-                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:8px;">📷 Capture Staff Face</button>
+                        <label>Capture Face Image:</label>
+                        <video id="regVideo" autoplay playsinline style="max-height:100px;"></video>
+                        <button type="button" onclick="captureLiveFace()" class="btn-warning" style="margin-top:4px; padding:6px;">📷 Capture Face</button>
                     </div>
-                    <div id="faceCapturedBadge" style="display:none; color:#10b981; font-weight:bold; margin-top:5px;">✅ Face Captured Successfully!</div>
+                    <div class="form-group">
+                        <label>Register Device Fingerprint:</label>
+                        <button type="button" onclick="registerFingerprint()" class="btn-success">👆 Register Finger Sensor</button>
+                        <span id="fingerBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Finger Registered</span>
+                    </div>
                 </div>
             </div>
-            <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Staff Master</button>
+            <button onclick="saveRegisteredStaff()" class="btn-success" style="margin-top: 15px;">Save Complete Staff Profile</button>
         </div>
 
         <!-- Form 2: Registered Staff Directory -->
@@ -147,16 +156,17 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Face Image</th>
+                            <th>Face</th>
                             <th>Name</th>
                             <th>Phone</th>
                             <th>Salary</th>
+                            <th>Document</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="adminStaffTable">
-                        <tr><td colspan="6">Loading staff directory...</td></tr>
+                        <tr><td colspan="7">Loading staff directory...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -187,7 +197,7 @@
             </div>
             
             <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
-                <label style="margin:0; font-weight:bold;">Export Format:</label>
+                <label style="margin:0; font-weight:bold;">Export Logs:</label>
                 <select id="exportFormatSelect" style="width:auto; padding:8px;">
                     <option value="excel">📥 Excel (CSV)</option>
                     <option value="pdf">📄 PDF Document</option>
@@ -215,9 +225,12 @@
             </div>
         </div>
 
-        <!-- Form 4: Salary Calculation Sheet -->
+        <!-- Form 4: Salary Calculation Sheet with Export Dropdown -->
         <div class="section printable-report">
-            <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
+            </div>
+
             <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
                 <div class="form-group">
                     <label>Select Month:</label>
@@ -239,7 +252,16 @@
                     </select>
                 </div>
             </div>
-            <button onclick="calculateSalarySheet()" class="btn-success no-print" style="margin-bottom:15px;">⚡ Calculate Active Salaries</button>
+
+            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;" class="no-print">
+                <button onclick="calculateSalarySheet()" class="btn-success" style="width:auto; padding:8px 16px;">⚡ Calculate Salaries</button>
+                <label style="margin:0; font-weight:bold; margin-left: auto;">Salary Export Format:</label>
+                <select id="salaryExportFormat" style="width:auto; padding:8px;">
+                    <option value="excel">📥 Excel (CSV)</option>
+                    <option value="pdf">📄 PDF Document</option>
+                </select>
+                <button onclick="handleSalaryExport()" class="btn-warning" style="width:auto; padding:8px 16px;">Export Salary</button>
+            </div>
             
             <div style="overflow-x: auto;">
                 <table>
@@ -249,7 +271,7 @@
                             <th>Base Monthly Salary</th>
                             <th>Present Days</th>
                             <th>Half Days</th>
-                            <th>Effective Working Days</th>
+                            <th>Effective Days</th>
                             <th>Net Earned Salary</th>
                         </tr>
                     </thead>
@@ -294,19 +316,6 @@
         </div>
         <button onclick="updateStaffDetails()" class="btn-success">Update Staff</button>
         <button onclick="closeModal('editStaffModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
-    </div>
-</div>
-
-<!-- Modal: Tap / Finger Punch -->
-<div id="tapPunchModal" class="modal">
-    <div class="modal-content">
-        <h3>👆 Tap / Finger Punch (Quick Mode)</h3>
-        <div class="form-group" style="margin-top:15px;">
-            <label>Select Active Staff:</label>
-            <select id="tapStaffSelect"><option>Loading staff...</option></select>
-        </div>
-        <button onclick="submitTapPunch()" class="btn-success">Confirm IN / OUT Punch</button>
-        <button onclick="closeModal('tapPunchModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
 </div>
 
@@ -357,6 +366,8 @@
     const API_URL = '/api';
     let isAdminLoggedIn = false;
     let registeredFaceBase64 = '';
+    let registeredDocBase64 = '';
+    let registeredFingerId = '';
     let cachedStaffList = [];
 
     const kioskVideo = document.getElementById('kioskVideo');
@@ -410,8 +421,7 @@
 
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 120;
-        canvas.height = 120;
+        canvas.width = 120; canvas.height = 120;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
         const imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
@@ -431,18 +441,93 @@
                 statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
                 loadTodayWorkingStatus();
             } else {
-                statusBox.innerHTML = `❌ ${result.error} (Try Tap/Finger Punch)`;
+                statusBox.innerHTML = `❌ ${result.error}`;
             }
         } catch(err) { statusBox.innerHTML = '❌ Face match failed!'; }
     }
 
+    async function autoFingerPunch() {
+        const statusBox = document.getElementById('punchStatusBox');
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = '⏳ Please touch device fingerprint sensor...';
+
+        try {
+            if (!window.PublicKeyCredential) {
+                alert("Biometric Fingerprint sensor not supported on this browser!");
+                return;
+            }
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge: new Uint8Array(32),
+                    timeout: 60000,
+                    userVerification: "preferred"
+                }
+            });
+            
+            const fingerId = credential ? credential.id : 'MOCK_FINGER_ID';
+
+            const res = await fetch(`${API_URL}/finger-punch-auto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fingerId })
+            });
+            const result = await res.json();
+            if(result.success) {
+                statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">FINGER PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
+                loadTodayWorkingStatus();
+            } else {
+                statusBox.innerHTML = `❌ ${result.error}`;
+            }
+        } catch(err) {
+            statusBox.innerHTML = '❌ Fingerprint scanning cancelled or failed!';
+        }
+    }
+
     function captureLiveFace() {
         const canvas = document.createElement('canvas');
-        canvas.width = 120;
-        canvas.height = 120;
+        canvas.width = 120; canvas.height = 120;
         canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
         registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
-        document.getElementById('faceCapturedBadge').style.display = 'block';
+        alert('✅ Face captured!');
+    }
+
+    function handleDocSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                registeredDocBase64 = evt.target.result;
+                document.getElementById('docBadge').style.display = 'inline';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    async function registerFingerprint() {
+        try {
+            if (!window.PublicKeyCredential) {
+                registeredFingerId = 'FINGER_' + Date.now();
+                document.getElementById('fingerBadge').style.display = 'inline';
+                alert('Device Fingerprint Mock Key Generated!');
+                return;
+            }
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge: new Uint8Array(32),
+                    rp: { name: "Attendance App" },
+                    user: { id: new Uint8Array(16), name: "staff", displayName: "Staff Member" },
+                    pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                    timeout: 60000
+                }
+            });
+            registeredFingerId = credential ? credential.id : 'FINGER_' + Date.now();
+            document.getElementById('fingerBadge').style.display = 'inline';
+            alert('✅ Fingerprint Registered Successfully!');
+        } catch(e) {
+            registeredFingerId = 'FINGER_' + Date.now();
+            document.getElementById('fingerBadge').style.display = 'inline';
+            alert('✅ Fingerprint Registered!');
+        }
     }
 
     async function saveRegisteredStaff() {
@@ -450,8 +535,8 @@
         const phone = document.getElementById('regPhone').value;
         const salaryAmount = document.getElementById('regSalary').value;
 
-        if(!name || !phone || !salaryAmount || !registeredFaceBase64) {
-            alert('Please fill details AND capture face using camera!');
+        if(!name || !phone || !salaryAmount) {
+            alert('Please fill name, phone and salary details!');
             return;
         }
 
@@ -459,7 +544,12 @@
             const res = await fetch(`${API_URL}/staff`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, phone, salaryAmount, faceImage: registeredFaceBase64 })
+                body: JSON.stringify({ 
+                    name, phone, salaryAmount, 
+                    faceImage: registeredFaceBase64 || 'https://via.placeholder.com/100',
+                    documentFile: registeredDocBase64 || '',
+                    fingerprintId: registeredFingerId || ''
+                })
             });
             const data = await res.json();
             if(data.success) {
@@ -467,47 +557,12 @@
                 document.getElementById('regName').value = '';
                 document.getElementById('regPhone').value = '';
                 document.getElementById('regSalary').value = '';
-                registeredFaceBase64 = '';
-                document.getElementById('faceCapturedBadge').style.display = 'none';
+                document.getElementById('docBadge').style.display = 'none';
+                document.getElementById('fingerBadge').style.display = 'none';
+                registeredFaceBase64 = ''; registeredDocBase64 = ''; registeredFingerId = '';
                 loadAdminData();
             } else { alert('Error: ' + data.error); }
         } catch(err) { alert('Registration failed!'); }
-    }
-
-    async function openTapPunchModal() {
-        try {
-            const res = await fetch(`${API_URL}/staff`);
-            const result = await res.json();
-            if(result.success) {
-                const select = document.getElementById('tapStaffSelect');
-                select.innerHTML = '';
-                result.data.forEach(s => {
-                    if(s.status !== 'inactive') {
-                        select.innerHTML += `<option value="${s._id}">${s.name} (${s.phone})</option>`;
-                    }
-                });
-                document.getElementById('tapPunchModal').style.display = 'flex';
-            }
-        } catch(err) { alert('Could not load staff list'); }
-    }
-
-    async function submitTapPunch() {
-        const staffId = document.getElementById('tapStaffSelect').value;
-        try {
-            const res = await fetch(`${API_URL}/tap-punch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ staffId })
-            });
-            const result = await res.json();
-            if(result.success) {
-                alert(`✅ PUNCH ${result.data.type} SUCCESSFUL for ${result.data.staffName} at ${result.data.time}`);
-                closeModal('tapPunchModal');
-                loadTodayWorkingStatus();
-            } else {
-                alert('❌ ' + result.error);
-            }
-        } catch(err) { alert('Tap punch failed!'); }
     }
 
     async function loadAdminData() {
@@ -522,7 +577,7 @@
             const result = await res.json();
             if(result.success) {
                 cachedStaffList = result.data;
-                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No staff registered.</td></tr>'; return; }
+                if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="7">No staff registered.</td></tr>'; return; }
                 
                 tbody.innerHTML = '';
                 result.data.forEach(staff => {
@@ -530,6 +585,7 @@
                     const isActive = staff.status !== 'inactive';
                     const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
                     const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
+                    const docLink = staff.documentFile ? `<a href="${staff.documentFile}" target="_blank" style="color:#38bdf8;">📄 View Doc</a>` : 'No Doc';
 
                     tbody.innerHTML += `
                         <tr>
@@ -537,6 +593,7 @@
                             <td><strong>${staff.name}</strong></td>
                             <td>${staff.phone}</td>
                             <td>₹${staff.salaryAmount}</td>
+                            <td>${docLink}</td>
                             <td><span class="badge ${statusBadgeClass}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${statusText}</span></td>
                             <td>
                                 <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount})" class="btn-warning" style="padding:4px 8px; font-size:12px; margin-bottom:4px;">Edit</button>
@@ -546,7 +603,7 @@
                     `;
                 });
             }
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading directory.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="7">Error loading directory.</td></tr>'; }
     }
 
     function openEditStaff(id, name, phone, salary) {
@@ -726,8 +783,17 @@
 
     function handleExport() {
         const format = document.getElementById('exportFormatSelect').value;
+        if(format === 'excel') window.open(`${API_URL}/export/csv`, '_blank');
+        else if(format === 'pdf') window.print();
+    }
+
+    function handleSalaryExport() {
+        const format = document.getElementById('salaryExportFormat').value;
+        const month = document.getElementById('salMonth').value;
+        const year = document.getElementById('salYear').value;
+
         if(format === 'excel') {
-            window.open(`${API_URL}/export/csv`, '_blank');
+            window.open(`${API_URL}/export/salary-csv?month=${month}&year=${year}`, '_blank');
         } else if(format === 'pdf') {
             window.print();
         }

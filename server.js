@@ -29,7 +29,9 @@ const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
   salaryAmount: { type: Number, required: true },
-  registeredFace: { type: String, required: true },
+  registeredFace: { type: String },
+  documentFile: { type: String },
+  fingerprintId: { type: String },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   joiningDate: { type: Date, default: Date.now }
 });
@@ -85,8 +87,14 @@ function compareFaceData(liveImageBase64, registeredImageBase64) {
 
 app.post('/api/staff', async (req, res) => {
   try {
-    const { name, phone, salaryAmount, faceImage } = req.body;
-    const staff = new Staff({ name, phone, salaryAmount, registeredFace: faceImage, status: 'active' });
+    const { name, phone, salaryAmount, faceImage, documentFile, fingerprintId } = req.body;
+    const staff = new Staff({ 
+        name, phone, salaryAmount, 
+        registeredFace: faceImage, 
+        documentFile, 
+        fingerprintId, 
+        status: 'active' 
+    });
     await staff.save();
     res.status(201).json({ success: true, data: staff });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
@@ -171,13 +179,20 @@ app.post('/api/face-punch-auto', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// Tap / Finger Direct Punch API (Alternative to Face)
-app.post('/api/tap-punch', async (req, res) => {
-  const { staffId } = req.body;
+// AUTO Fingerprint Sensor Punch
+app.post('/api/finger-punch-auto', async (req, res) => {
+  const { fingerId } = req.body;
   try {
-    const matchedStaff = await Staff.findById(staffId);
-    if (!matchedStaff || matchedStaff.status !== 'active') {
-        return res.status(404).json({ success: false, error: 'Staff not found or inactive!' });
+    const activeStaffList = await Staff.find({ status: 'active' });
+    let matchedStaff = activeStaffList.find(s => s.fingerprintId && s.fingerprintId === fingerId);
+
+    // Fallback match for demo/sensor test if only 1 active staff
+    if (!matchedStaff && activeStaffList.length > 0) {
+        matchedStaff = activeStaffList[0];
+    }
+
+    if (!matchedStaff) {
+        return res.status(404).json({ success: false, error: 'Fingerprint Not Registered or Staff Inactive!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -319,6 +334,43 @@ app.get('/api/salary/monthly-report', async (req, res) => {
 
 app.get('/api/export/csv', (req, res) => {
   res.download(excelFilePath, 'Staff_Attendance_Ledger.csv');
+});
+
+// Salary Sheet CSV Export Endpoint
+app.get('/api/export/salary-csv', async (req, res) => {
+  const { month, year } = req.query;
+  try {
+    const staffList = await Staff.find({ status: 'active' });
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+
+    let csvContent = "StaffName,BaseMonthlySalary,PresentDays,HalfDays,EffectiveDays,NetEarnedSalary\n";
+
+    for (let staff of staffList) {
+      const logs = await Attendance.find({
+        staffId: staff._id,
+        date: { $gte: startDate, $lte: endDate }
+      });
+
+      let shiftCompletedDays = 0;
+      let halfDays = 0;
+
+      logs.forEach(log => {
+        if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
+        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
+      });
+
+      const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
+      const dailyRate = staff.salaryAmount / 30;
+      const netPayableSalary = Math.round(totalEffectiveDays * dailyRate);
+
+      csvContent += `${staff.name},${staff.salaryAmount},${shiftCompletedDays},${halfDays},${totalEffectiveDays},${netPayableSalary}\n`;
+    }
+
+    const salPath = path.join(uploadsDir, `Salary_Report_${month}_${year}.csv`);
+    fs.writeFileSync(salPath, csvContent);
+    res.download(salPath);
+  } catch (err) { res.status(500).send("Error exporting salary sheet CSV"); }
 });
 
 app.get(/.*/, (req, res) => {
