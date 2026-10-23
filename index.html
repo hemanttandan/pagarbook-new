@@ -163,7 +163,7 @@
             </div>
         </div>
 
-        <!-- Form 3: Attendance Logs with Export Dropdown -->
+        <!-- Form 3: Attendance Logs -->
         <div class="section printable-report">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3>📋 Monthly Attendance Logs</h3>
@@ -206,10 +206,11 @@
                             <th>Punch OUT</th>
                             <th>Work Hours</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="adminAttendanceTable">
-                        <tr><td colspan="6">Loading logs...</td></tr>
+                        <tr><td colspan="7">Loading logs...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -217,7 +218,7 @@
 
         <!-- Form 4: Salary Calculation Sheet -->
         <div class="section printable-report">
-            <h3>💰 Monthly Salary Calculation Sheet</h3>
+            <h3>💰 Monthly Salary Calculation Sheet (Active Staff)</h3>
             <div class="no-print grid-2" style="margin-top:10px; margin-bottom:10px;">
                 <div class="form-group">
                     <label>Select Month:</label>
@@ -239,7 +240,7 @@
                     </select>
                 </div>
             </div>
-            <button onclick="calculateSalarySheet()" class="btn-success no-print" style="margin-bottom:15px;">⚡ Calculate Monthly Salary</button>
+            <button onclick="calculateSalarySheet()" class="btn-success no-print" style="margin-bottom:15px;">⚡ Calculate Active Salaries</button>
             
             <div style="overflow-x: auto;">
                 <table>
@@ -294,6 +295,24 @@
         </div>
         <button onclick="updateStaffDetails()" class="btn-success">Update Staff</button>
         <button onclick="closeModal('editStaffModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
+    </div>
+</div>
+
+<!-- Modal: Edit Punch Time -->
+<div id="editPunchModal" class="modal">
+    <div class="modal-content">
+        <h3>⏰ Edit Punch Times</h3>
+        <input type="hidden" id="editPunchId">
+        <div class="form-group">
+            <label>Punch IN Time (HH:MM):</label>
+            <input type="text" id="editPunchIn" placeholder="09:00">
+        </div>
+        <div class="form-group">
+            <label>Punch OUT Time (HH:MM):</label>
+            <input type="text" id="editPunchOut" placeholder="18:00">
+        </div>
+        <button onclick="savePunchTimeEdit()" class="btn-success">Update Punch Times</button>
+        <button onclick="closeModal('editPunchModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
 </div>
 
@@ -379,11 +398,11 @@
 
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = kioskVideo.videoWidth || 320;
-        canvas.height = kioskVideo.videoHeight || 240;
+        canvas.width = 160;
+        canvas.height = 120;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const imageBase64 = canvas.toDataURL('image/png');
+        const imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
         const statusBox = document.getElementById('punchStatusBox');
         statusBox.style.display = 'block';
@@ -419,10 +438,10 @@
 
     function captureLiveFace() {
         const canvas = document.createElement('canvas');
-        canvas.width = regVideo.videoWidth || 320;
-        canvas.height = regVideo.videoHeight || 240;
+        canvas.width = 160;
+        canvas.height = 120;
         canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
-        registeredFaceBase64 = canvas.toDataURL('image/png');
+        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
         document.getElementById('faceCapturedBadge').style.display = 'block';
     }
 
@@ -549,7 +568,7 @@
         try {
             const res = await fetch(`${API_URL}/attendance/all?month=${month}&year=${year}`);
             const result = await res.json();
-            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No logs found.</td></tr>'; return; }
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="7">No logs found.</td></tr>'; return; }
             
             tbody.innerHTML = '';
             result.data.forEach(row => {
@@ -561,10 +580,38 @@
                         <td>${row.punchOut || 'N/A'}</td>
                         <td>${row.workHours || 0} hrs</td>
                         <td><span class="badge bg-present">${row.status.toUpperCase()}</span></td>
+                        <td><button onclick="openEditPunchModal('${row._id}', '${row.punchIn || ''}', '${row.punchOut || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px;">Edit Time</button></td>
                     </tr>
                 `;
             });
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="6">Error loading logs.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="7">Error loading logs.</td></tr>'; }
+    }
+
+    function openEditPunchModal(id, punchIn, punchOut) {
+        document.getElementById('editPunchId').value = id;
+        document.getElementById('editPunchIn').value = punchIn;
+        document.getElementById('editPunchOut').value = punchOut;
+        document.getElementById('editPunchModal').style.display = 'flex';
+    }
+
+    async function savePunchTimeEdit() {
+        const id = document.getElementById('editPunchId').value;
+        const punchIn = document.getElementById('editPunchIn').value;
+        const punchOut = document.getElementById('editPunchOut').value;
+
+        try {
+            const res = await fetch(`${API_URL}/attendance/edit-time`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, punchIn, punchOut })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert('Punch times updated successfully!');
+                closeModal('editPunchModal');
+                loadFilteredAttendanceLogs();
+            } else { alert('Error: ' + data.error); }
+        } catch(err) { alert('Failed to update punch time!'); }
     }
 
     async function calculateSalarySheet() {
@@ -575,7 +622,7 @@
         try {
             const res = await fetch(`${API_URL}/salary/monthly-report?month=${month}&year=${year}`);
             const result = await res.json();
-            if(!result.data || !result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No salary records for selected month.</td></tr>'; return; }
+            if(!result.data || !result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No active staff salary records found.</td></tr>'; return; }
 
             tbody.innerHTML = '';
             result.data.forEach(item => {

@@ -57,35 +57,23 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// 🛡️ Robust Face Matching Engine
+// 🛡️ Reliable Face Matching Engine (Active Staff Only)
 function compareFaceData(liveImageBase64, registeredImageBase64) {
     if (!liveImageBase64 || !registeredImageBase64) return false;
-    
     const cleanLive = liveImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
     const cleanReg = registeredImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
 
-    let matchedChunks = 0;
-    const totalSegments = 10;
-    const chunkSize = Math.floor(Math.min(cleanLive.length, cleanReg.length) / totalSegments);
+    const lenRatio = Math.min(cleanLive.length, cleanReg.length) / Math.max(cleanLive.length, cleanReg.length);
+    if (lenRatio < 0.5) return false;
 
-    if (chunkSize < 10) return cleanLive.length === cleanReg.length;
-
-    for (let i = 0; i < totalSegments; i++) {
-        const start = i * chunkSize;
-        const subLive = cleanLive.substring(start, start + 30);
-        const subReg = cleanReg.substring(start, start + 30);
-        
-        let subMatches = 0;
-        for (let j = 0; j < subLive.length; j++) {
-            if (subLive[j] === subReg[j]) subMatches++;
-        }
-        
-        if ((subMatches / subLive.length) > 0.25) {
-            matchedChunks++;
-        }
+    let matches = 0;
+    const sampleSize = 60;
+    const step = Math.floor(cleanReg.length / sampleSize);
+    for (let i = 0; i < sampleSize; i++) {
+        const idx = i * step;
+        if (cleanLive[idx] === cleanReg[idx]) matches++;
     }
-
-    return (matchedChunks / totalSegments) >= 0.35;
+    return (matches / sampleSize) >= 0.25;
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -130,13 +118,14 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
+// Auto Face Recognition Punch - Strictly for ACTIVE Staff Only
 app.post('/api/face-punch-auto', async (req, res) => {
   const { image } = req.body;
   try {
-    const staffList = await Staff.find({ status: 'active' });
+    const activeStaffList = await Staff.find({ status: 'active' });
     let matchedStaff = null;
 
-    for (let staff of staffList) {
+    for (let staff of activeStaffList) {
         if (compareFaceData(image, staff.registeredFace)) {
             matchedStaff = staff;
             break;
@@ -144,7 +133,7 @@ app.post('/api/face-punch-auto', async (req, res) => {
     }
 
     if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Face Not Recognized! Please align face properly.' });
+        return res.status(404).json({ success: false, error: 'Face Not Recognized or Staff is Inactive!' });
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -184,10 +173,28 @@ app.post('/api/attendance/manual', async (req, res) => {
     const hours = status === 'present' ? 8 : (status === 'half_day' ? 4 : 0);
     const attendance = await Attendance.findOneAndUpdate(
       { staffId, date },
-      { status, workHours: hours, punchIn: 'Manual', punchOut: 'Manual' },
+      { status, workHours: hours, punchIn: '09:00', punchOut: '17:00' },
       { upsert: true, new: true }
     );
     res.json({ success: true, data: attendance });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
+app.post('/api/attendance/edit-time', async (req, res) => {
+  const { id, punchIn, punchOut } = req.body;
+  try {
+    let record = await Attendance.findById(id);
+    if (!record) return res.status(404).json({ success: false, error: 'Record not found' });
+
+    record.punchIn = punchIn;
+    record.punchOut = punchOut;
+    if (punchIn && punchOut) {
+        record.workHours = calculateHours(punchIn, punchOut);
+        if (record.workHours < 5) record.status = 'half_day';
+        else record.status = 'present';
+    }
+    await record.save();
+    res.json({ success: true, data: record });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
@@ -226,10 +233,11 @@ app.get('/api/attendance/all', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
+// Salary Calculation Report for ACTIVE Staff Only
 app.get('/api/salary/monthly-report', async (req, res) => {
   const { month, year } = req.query;
   try {
-    const staffList = await Staff.find();
+    const staffList = await Staff.find({ status: 'active' });
     const startDate = `${year}-${month.padStart(2, '0')}-01`;
     const endDate = `${year}-${month.padStart(2, '0')}-31`;
 
