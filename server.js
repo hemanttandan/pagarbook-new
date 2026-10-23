@@ -6,13 +6,11 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(express.json({ limit: '50mb' })); // Base64 Face Image Payload Support
+app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
-// Express ko static frontend serve karne ke liye batayein
 app.use(express.static(__dirname));
 
-// Uploads directory for Face Photos & Excel CSV Ledger
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
@@ -23,12 +21,12 @@ if (!fs.existsSync(excelFilePath)) {
     fs.writeFileSync(excelFilePath, 'Type,StaffName,Phone,Date,Status,SalaryAmount,DriveExcelFolder,DriveImageFolder\n');
 }
 
-// MongoDB Database Connection
+// Database Connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB Database Connected Successfully!'))
+  .then(() => console.log('✅ MongoDB Connected Successfully!'))
   .catch((err) => console.log('❌ Connection Error:', err));
 
-// Database Schemas (Inline define kar diye hain)
+// Database Schemas
 const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String, required: true, unique: true },
@@ -47,49 +45,23 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Helper Function: Send Data to Google Apps Script (Sheet & Drive Sync)
-async function sendToGoogleScript(payload) {
-  try {
-    const scriptUrl = process.env.GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbzoOe9P43oK62Mg12e3WegbbIL9jb234Jiz_26wEoPertZfizslL0j_kANUMkxpGWzqmg/exec";
-    await fetch(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log('✅ Synced to Google Sheet & Drive via Apps Script!');
-  } catch (err) {
-    console.log('❌ Google Sync Error:', err.message);
-  }
-}
-
-// Helper Function: Append to Local CSV Ledger
+// Helper Function: Append to CSV Ledger
 function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
-    console.log(`[Google Drive Excel Sync] Folder ID (1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0) -> Logged: ${rowText}`);
 }
 
 // ---------------- API ENDPOINTS ----------------
 
-// 1. Add Staff Master API
+// 1. Add Staff API
 app.post('/api/staff', async (req, res) => {
   try {
     const staff = new Staff(req.body);
     await staff.save();
 
     const todayDate = new Date().toISOString().split('T')[0];
-    const row = `STAFF_REGISTER,${staff.name},${staff.phone},${todayDate},ACTIVE,${staff.salaryAmount},1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0,N/A`;
-    appendToExcelLedger(row);
+    appendToExcelLedger(`STAFF_REGISTER,${staff.name},${staff.phone},${todayDate},ACTIVE,${staff.salaryAmount},N/A,N/A`);
 
-    // Google Apps Script Sync
-    await sendToGoogleScript({
-      action: 'STAFF_REGISTER',
-      name: staff.name,
-      phone: staff.phone,
-      salaryAmount: staff.salaryAmount,
-      date: todayDate
-    });
-
-    res.status(201).json({ success: true, message: 'Staff added & synced to Drive!', data: staff });
+    res.status(201).json({ success: true, message: 'Staff added successfully!', data: staff });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -105,7 +77,28 @@ app.get('/api/staff', async (req, res) => {
   }
 });
 
-// 3. PagarBook Lens Face Punch API (Save Image & Attendance)
+// 3. Edit Staff API
+app.put('/api/staff/:id', async (req, res) => {
+  try {
+    const staff = await Staff.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: staff });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Delete Staff API
+app.delete('/api/staff/:id', async (req, res) => {
+  try {
+    await Staff.findByIdAndDelete(req.params.id);
+    await Attendance.deleteMany({ staffId: req.params.id });
+    res.json({ success: true, message: 'Staff and attendance deleted!' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Face Punch API
 app.post('/api/face-punch', async (req, res) => {
   const { staffId, image } = req.body;
   try {
@@ -116,14 +109,11 @@ app.post('/api/face-punch', async (req, res) => {
     const timeNow = new Date().toLocaleTimeString();
 
     let savedImagePath = '';
-    let fileName = '';
     if (image) {
       const base64Data = image.replace(/^data:image\/png;base64,/, "");
-      fileName = `LENS_${staff.name.replace(/\s+/g, '_')}_${today}_${Date.now()}.png`;
+      const fileName = `LENS_${staff.name.replace(/\s+/g, '_')}_${today}_${Date.now()}.png`;
       savedImagePath = path.join(uploadsDir, fileName);
       fs.writeFileSync(savedImagePath, base64Data, 'base64');
-      
-      console.log(`[Google Drive Image Sync] Lens Photo saved to Images Folder (1RoAc06fNeO7HqGCVuyqfCFIOUhHf3bUG): ${fileName}`);
     }
 
     const attendance = await Attendance.findOneAndUpdate(
@@ -132,26 +122,51 @@ app.post('/api/face-punch', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    const row = `FACE_PUNCH_LOG,${staff.name},${staff.phone},${today},PRESENT,${staff.salaryAmount},1i0MCor11SvS7Zq1mbK-ARN9hMSPnnvb0,1RoAc06fNeO7HqGCVuyqfCFIOUhHf3bUG/${fileName}`;
-    appendToExcelLedger(row);
+    appendToExcelLedger(`FACE_PUNCH_LOG,${staff.name},${staff.phone},${today},PRESENT,${staff.salaryAmount},N/A,${savedImagePath}`);
 
-    // Google Apps Script Sync
-    await sendToGoogleScript({
-      action: 'FACE_PUNCH',
-      name: staff.name,
-      phone: staff.phone,
-      salaryAmount: staff.salaryAmount,
-      image: image,
-      date: today
-    });
-
-    res.json({ success: true, message: 'Face punch attendance recorded successfully!', data: attendance });
+    res.json({ success: true, message: 'Face punch attendance recorded!', data: attendance });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// 4. Monthly Salary Calculation API
+// 6. Manual Attendance Override API (Absent, Present, Half Day)
+app.post('/api/attendance/manual', async (req, res) => {
+  const { staffId, date, status } = req.body;
+  try {
+    const attendance = await Attendance.findOneAndUpdate(
+      { staffId, date },
+      { status, punchTime: 'Manual Entry' },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, data: attendance });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Get Today's Working Staff Status
+app.get('/api/attendance/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const logs = await Attendance.find({ date: today }).populate('staffId');
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. Get All Attendance Logs
+app.get('/api/attendance/all', async (req, res) => {
+  try {
+    const logs = await Attendance.find().populate('staffId').sort({ date: -1 });
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. Monthly Salary Calculation API
 app.get('/api/salary/calculate', async (req, res) => {
   const { staffId, month, year } = req.query;
   try {
@@ -194,7 +209,12 @@ app.get('/api/salary/calculate', async (req, res) => {
   }
 });
 
-// Wildcard Route to Serve index.html securely
+// 10. CSV Export Endpoint
+app.get('/api/export/csv', (req, res) => {
+  res.download(excelFilePath, 'Staff_Attendance_Ledger.csv');
+});
+
+// Wildcard Route
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
