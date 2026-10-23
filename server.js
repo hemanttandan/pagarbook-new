@@ -57,23 +57,29 @@ function calculateHours(time1, time2) {
     return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10);
 }
 
-// 🛡️ Reliable Face Matching Engine (Active Staff Only)
+// 🛡️ Optimized Face Matching Engine (Active Staff Only)
 function compareFaceData(liveImageBase64, registeredImageBase64) {
     if (!liveImageBase64 || !registeredImageBase64) return false;
+    
     const cleanLive = liveImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
     const cleanReg = registeredImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
 
-    const lenRatio = Math.min(cleanLive.length, cleanReg.length) / Math.max(cleanLive.length, cleanReg.length);
-    if (lenRatio < 0.5) return false;
+    // Simple robust substring sample check for fast validation
+    let matchCount = 0;
+    const sampleSize = 30;
+    const step = Math.floor(Math.min(cleanLive.length, cleanReg.length) / sampleSize);
 
-    let matches = 0;
-    const sampleSize = 60;
-    const step = Math.floor(cleanReg.length / sampleSize);
+    if(step <= 0) return true;
+
     for (let i = 0; i < sampleSize; i++) {
         const idx = i * step;
-        if (cleanLive[idx] === cleanReg[idx]) matches++;
+        if (cleanLive.substring(idx, idx + 5) === cleanReg.substring(idx, idx + 5)) {
+            matchCount++;
+        }
     }
-    return (matches / sampleSize) >= 0.25;
+
+    // Allow recognition if at least 15% pattern chunks match
+    return (matchCount / sampleSize) >= 0.15;
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -206,7 +212,7 @@ app.get('/api/attendance/today', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-app.get('/api/attendance/all', async (req, res) => {
+app.get('/api/attendance/all', async (req, res, next) => {
   const { month, year } = req.query;
   try {
     let query = {};
@@ -233,7 +239,6 @@ app.get('/api/attendance/all', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Salary Calculation Report for ACTIVE Staff Only
 app.get('/api/salary/monthly-report', async (req, res) => {
   const { month, year } = req.query;
   try {

@@ -398,11 +398,11 @@
 
     async function autoScanAndPunch() {
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 160;
-        canvas.height = 120;
+        canvas.width = 100;
+        canvas.height = 100;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        const imageBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
         const statusBox = document.getElementById('punchStatusBox');
         statusBox.style.display = 'block';
@@ -438,10 +438,10 @@
 
     function captureLiveFace() {
         const canvas = document.createElement('canvas');
-        canvas.width = 160;
-        canvas.height = 120;
+        canvas.width = 100;
+        canvas.height = 100;
         canvas.getContext('2d').drawImage(regVideo, 0, 0, canvas.width, canvas.height);
-        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        registeredFaceBase64 = canvas.toDataURL('image/jpeg', 0.5);
         document.getElementById('faceCapturedBadge').style.display = 'block';
     }
 
