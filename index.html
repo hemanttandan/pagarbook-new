@@ -139,7 +139,7 @@
                     </div>
                     <div class="form-group">
                         <label>Allowed Radius (Meters):</label>
-                        <input type="number" id="locRadiusInput" value="100" placeholder="Default 100 meters">
+                        <input type="number" id="locRadiusInput" value="500" placeholder="Default 500 meters">
                     </div>
                     <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
                 </div>
@@ -357,7 +357,7 @@
     </div>
 </div>
 
-<!-- Modal: Edit Staff (Details, PIN, Photo, Document) -->
+<!-- Modal: Edit Staff -->
 <div id="editStaffModal" class="modal">
     <div class="modal-content">
         <h3>✏️ Edit Staff Directory Entry</h3>
@@ -524,7 +524,6 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // Step 1: Verify PIN
     async function verifyPinAndShowName() {
         const pin = document.getElementById('staffPinInput').value;
         const nameBox = document.getElementById('staffNameDisplayBox');
@@ -561,7 +560,7 @@
         }
     }
 
-    // Step 2 & 3: Submit Punch
+    // Geolocation with Fallback for Mobile Devices
     function captureAndSubmitPunch() {
         const pin = document.getElementById('staffPinInput').value;
         const statusBox = document.getElementById('punchStatusBox');
@@ -572,52 +571,62 @@
         canvas.width = 240; canvas.height = 240;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
-        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5); // Compressed Image
+        const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
         statusBox.style.display = 'block';
         statusBox.innerHTML = '⏳ Fetching Location & Verifying Coordinates...';
 
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(async function(position) {
-                const userLat = position.coords.latitude;
-                const userLng = position.coords.longitude;
-
-                try {
-                    const res = await fetch(`${API_URL}/submit-photo-geofenced-punch`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            pin, 
-                            lat: userLat, 
-                            lng: userLng,
-                            photo: capturedPhotoBase64
-                        })
-                    });
-                    const result = await res.json();
-                    if(result.success) {
-                        statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
-                        
-                        document.getElementById('staffPinInput').value = '';
-                        document.getElementById('staffNameDisplayBox').style.display = 'none';
-                        document.getElementById('cameraStepBox').style.display = 'none';
-                        currentVerifiedStaff = null;
-
-                        loadTodayWorkingStatus();
-                    } else {
-                        statusBox.innerHTML = `❌ ${result.error}`;
-                    }
-                } catch(err) {
-                    statusBox.innerHTML = '❌ Server Error!';
+        const sendPunchRequest = async (lat, lng) => {
+            try {
+                const res = await fetch(`${API_URL}/submit-photo-geofenced-punch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin, lat, lng, photo: capturedPhotoBase64 })
+                });
+                const result = await res.json();
+                if(result.success) {
+                    statusBox.innerHTML = `✅ <span style="color:#38bdf8;">${result.data.staffName}</span><br><span style="color:#10b981;">PUNCH ${result.data.type} SUCCESSFUL</span> (${result.data.time})`;
+                    document.getElementById('staffPinInput').value = '';
+                    document.getElementById('staffNameDisplayBox').style.display = 'none';
+                    document.getElementById('cameraStepBox').style.display = 'none';
+                    currentVerifiedStaff = null;
+                    loadTodayWorkingStatus();
+                } else {
+                    statusBox.innerHTML = `❌ ${result.error}`;
                 }
-            }, function(error) {
-                statusBox.innerHTML = '❌ Location Access Denied! Please Turn On GPS/Location on Phone.';
-            }, { enableHighAccuracy: true, timeout: 10000 });
+            } catch(err) {
+                statusBox.innerHTML = '❌ Server Error!';
+            }
+        };
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    sendPunchRequest(position.coords.latitude, position.coords.longitude);
+                }, 
+                function(error) {
+                    // Fallback option if mobile GPS blocks or fails
+                    let manualLat = prompt("GPS Location fetch nahi ho paayi! Kripya apne office ki Latitude dalein (e.g. 21.2514):", "21.2514");
+                    let manualLng = prompt("Kripya apne office ki Longitude dalein (e.g. 81.6296):", "81.6296");
+                    if(manualLat && manualLng) {
+                        sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
+                    } else {
+                        statusBox.innerHTML = '❌ Location Access Denied & Manual Entry Cancelled!';
+                    }
+                }, 
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            );
         } else {
-            statusBox.innerHTML = '❌ Geolocation Not Supported by Browser!';
+            let manualLat = prompt("Browser Geolocation Not Supported! Latitude dalein:", "21.2514");
+            let manualLng = prompt("Longitude dalein:", "81.6296");
+            if(manualLat && manualLng) {
+                sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
+            } else {
+                statusBox.innerHTML = '❌ Geolocation Not Supported!';
+            }
         }
     }
 
-    // Auto Image Compressor for File Input
     function compressAndConvertImage(file, callback) {
         const reader = new FileReader();
         reader.onload = function(event) {
@@ -764,7 +773,7 @@
             const res = await fetch(`${API_URL}/locations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, urlOrCoords, radiusMeters: Number(radiusMeters) })
+                body: JSON.stringify({ name, urlOrCoords, radiusMeters: Number(radiusMeters) || 500 })
             });
             const data = await res.json();
             if(data.success) {

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(express.json({ limit: '100mb' })); // Increased Limit for Safe Payload Processing
+app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(cors());
 
@@ -30,7 +30,7 @@ const locationSchema = new mongoose.Schema({
   name: { type: String, required: true },
   lat: { type: Number, required: true },
   lng: { type: Number, required: true },
-  radiusMeters: { type: Number, default: 100 }
+  radiusMeters: { type: Number, default: 500 }
 });
 const Location = mongoose.model('Location', locationSchema);
 
@@ -85,7 +85,7 @@ async function isWithinAllowedLocations(userLat, userLng) {
     for (let loc of locations) {
         let distKm = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
         let distMeters = distKm * 1000;
-        if (distMeters <= loc.radiusMeters) return true;
+        if (distMeters <= (loc.radiusMeters || 500)) return true;
     }
     return false;
 }
@@ -94,7 +94,6 @@ function appendToExcelLedger(rowText) {
     fs.appendFileSync(excelFilePath, rowText + '\n');
 }
 
-// ⏰ Indian Standard Time (IST - Asia/Kolkata) Accurate Format Fix
 function getIndianCurrentTime() {
     return new Date().toLocaleTimeString('en-IN', { 
         timeZone: 'Asia/Kolkata', 
@@ -127,7 +126,6 @@ function calculateHours(time1, time2) {
 
 // ---------------- API ENDPOINTS ----------------
 
-// 📍 LOCATION MANAGEMENT APIs
 app.get('/api/locations', async (req, res) => {
   try {
     const locs = await Location.find();
@@ -141,7 +139,7 @@ app.post('/api/locations', async (req, res) => {
     const coords = parseCoordinates(urlOrCoords);
     if (!coords) return res.status(400).json({ success: false, error: "Invalid Coordinates or Link!" });
 
-    const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: radiusMeters || 100 });
+    const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: radiusMeters || 500 });
     await loc.save();
     res.status(201).json({ success: true, data: loc });
   } catch(e) { res.status(400).json({ success: false, error: e.message }); }
@@ -154,7 +152,6 @@ app.delete('/api/locations/:id', async (req, res) => {
   } catch(e) { res.status(400).json({ success: false, error: e.message }); }
 });
 
-// 👥 STAFF MANAGEMENT APIs
 app.post('/api/staff', async (req, res) => {
   try {
     const { name, phone, salaryAmount, pin, photo, documentFile } = req.body;
@@ -199,7 +196,6 @@ app.delete('/api/staff/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// ⚡ Step 1 PIN Verification Endpoint
 app.post('/api/verify-pin', async (req, res) => {
   const { pin } = req.body;
   try {
@@ -211,11 +207,9 @@ app.post('/api/verify-pin', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
-// ⚡ Step 2 & 3: Submit Captured Photo + GPS Location Punch Endpoint
 app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
   const { pin, lat, lng, photo } = req.body;
   try {
-    // 1. Verify GPS Radius First
     const allowed = await isWithinAllowedLocations(lat, lng);
     if (!allowed) {
         return res.status(403).json({ 
@@ -224,7 +218,6 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
         });
     }
 
-    // 2. Match PIN & Active Status
     const matchedStaff = await Staff.findOne({ pin, status: 'active' });
     if (!matchedStaff) {
         return res.status(404).json({ success: false, error: 'Incorrect PIN or Staff Inactive!' });
