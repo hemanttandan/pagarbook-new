@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance & Payroll App</title>
-    <!-- Leaflet Interactive Maps CSS & JS (Free Map Pinning) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -39,10 +38,7 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        /* Camera Box Style */
         .cam-preview-box { width: 220px; height: 260px; border-radius: 12px; border: 2px solid #38bdf8; object-fit: cover; margin: 10px auto; display: block; transform: scaleX(-1); background: #000; }
-        
-        /* Interactive Map Container */
         #map { width: 100%; height: 260px; border-radius: 8px; border: 2px solid #38bdf8; margin-bottom: 10px; z-index: 1; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -52,14 +48,21 @@
         .bg-present { background: #065f46; color: #34d399; }
         .bg-completed { background: #0284c7; color: #e0f2fe; }
         .bg-halfday { background: #92400e; color: #fcd34d; }
+        .bg-absent { background: #991b1b; color: #fca5a5; }
         .bg-active { background: #065f46; color: #34d399; cursor: pointer; }
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 480px; text-align: left; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 550px; text-align: left; position: relative; }
         
         .thumb-img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
+
+        /* Zoom Container Styles */
+        .zoom-controls { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+        .zoom-controls button { width: auto; padding: 6px 12px; font-size: 12px; }
+        .img-zoom-container { overflow: auto; max-height: 380px; text-align: center; background: #000; padding: 10px; border-radius: 8px; }
+        .img-zoom-container img { transition: transform 0.2s ease; max-width: 100%; display: inline-block; }
 
         @media print {
             body * { visibility: hidden; }
@@ -110,7 +113,7 @@
             </div>
 
             <div class="section active-section" style="display:block;">
-                <h3>🟢 Working Staff Status (Today)</h3>
+                <h3>🟢 Working Staff Status (Today) <small style="font-size:11px; color:#10b981; float:right;">🔄 Auto-refreshing</small></h3>
                 <div style="max-height: 350px; overflow-y: auto;">
                     <table>
                         <thead>
@@ -130,7 +133,7 @@
         </div>
     </div>
 
-    <!-- 2. ADMIN DASHBOARD WITH COLLAPSIBLE SIDEBAR -->
+    <!-- 2. ADMIN DASHBOARD -->
     <div id="adminSection" style="display: none;">
         <div class="section no-print active-section" style="background:#0f172a; border-left:4px solid #38bdf8; display:block; margin-bottom:15px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -152,16 +155,14 @@
             </div>
 
             <div>
-                <!-- TAB 1: LOCATIONS WITH MAP PIN -->
+                <!-- TAB 1: LOCATIONS -->
                 <div id="tab-locations" class="section active-section" style="border:1px solid #38bdf8;">
                     <h3>📍 Set Office Location on Map</h3>
                     <p style="font-size:12px; color:#94a3b8; margin-bottom:10px;">Map par click karke exact location **Pin** karein ya **"Use My Location"** button dabayein.</p>
 
                     <div class="grid-2">
                         <div>
-                            <!-- MAP DISPLAY -->
                             <div id="map"></div>
-
                             <button type="button" onclick="useCurrentLocationOnMap()" class="btn-warning" style="margin-bottom:10px; font-size:13px; padding:8px;">🎯 Use My Current Location</button>
 
                             <div class="form-group">
@@ -257,10 +258,10 @@
                     </div>
                 </div>
 
-                <!-- TAB 4: ATTENDANCE LOGS -->
+                <!-- TAB 4: ATTENDANCE LOGS (IN & OUT IMAGES) -->
                 <div id="tab-logs" class="section printable-report">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <h3>📋 Monthly Attendance Logs</h3>
+                        <h3>📋 Monthly Attendance Logs <small style="font-size:11px; color:#10b981;">🔄 Auto-refreshing</small></h3>
                         <div style="display:flex; gap:8px; align-items:center;" class="no-print">
                             <select id="logMonthFilter" onchange="loadFilteredAttendanceLogs()" style="width:auto;">
                                 <option value="ALL">All Months</option>
@@ -289,10 +290,20 @@
                     <div style="overflow-x: auto;">
                         <table>
                             <thead>
-                                <tr><th>Face Photo</th><th>Date</th><th>Staff Name</th><th>Punch IN</th><th>Punch OUT</th><th>Hours</th><th>Status</th><th>Action</th></tr>
+                                <tr>
+                                    <th>IN Photo</th>
+                                    <th>OUT Photo</th>
+                                    <th>Date</th>
+                                    <th>Staff Name</th>
+                                    <th>Punch IN</th>
+                                    <th>Punch OUT</th>
+                                    <th>Hours</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
                             </thead>
                             <tbody id="adminAttendanceTable">
-                                <tr><td colspan="8">Loading logs...</td></tr>
+                                <tr><td colspan="9">Loading logs...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -343,7 +354,7 @@
     </div>
 </div>
 
-<!-- Modal: Admin PIN Login -->
+<!-- Modal: Admin Login -->
 <div id="loginModal" class="modal">
     <div class="modal-content">
         <h3>🔒 Admin Security Access</h3>
@@ -408,11 +419,17 @@
     </div>
 </div>
 
-<!-- Modal: Preview -->
+<!-- Modal: Zoomable Document / Image Preview -->
 <div id="previewModal" class="modal">
-    <div class="modal-content" style="text-align:center; max-width:600px;">
-        <h3 id="previewTitle">Preview</h3>
-        <div id="previewBody" style="margin-top:15px; max-height:400px; overflow:auto;"></div>
+    <div class="modal-content" style="text-align:center;">
+        <h3 id="previewTitle">Document Preview</h3>
+        <div class="zoom-controls" id="zoomButtonsBox">
+            <button onclick="zoomImage(0.2)" class="btn-warning">🔍 Zoom In</button>
+            <button onclick="zoomImage(-0.2)" class="btn-warning">🔍 Zoom Out</button>
+            <button onclick="resetZoom()" class="btn-warning">🔄 Reset</button>
+            <a id="downloadBtn" download="Document" class="nav-btn" style="text-decoration:none; display:inline-block; font-size:12px; padding:6px 12px; background:#10b981;">📥 Download</a>
+        </div>
+        <div id="previewBody" class="img-zoom-container"></div>
         <button onclick="closeModal('previewModal')" class="btn-danger" style="margin-top:15px;">Close</button>
     </div>
 </div>
@@ -423,7 +440,7 @@
         <h3>📝 Manual Attendance Override</h3>
         <div class="form-group"><label>Select Staff:</label><select id="manualStaffSelect"><option>Loading...</option></select></div>
         <div class="form-group"><label>Date:</label><input type="date" id="manualDate"></div>
-        <div class="form-group"><label>Status:</label><select id="manualStatus"><option value="present">Present</option><option value="half_day">Half Day</option><option value="absent">Absent</option></select></div>
+        <div class="form-group"><label>Status:</label><select id="manualStatus"><option value="present">Present (Full Day)</option><option value="half_day">Half Day</option><option value="absent">Absent</option></select></div>
         <button onclick="saveManualAttendance()" class="btn-success">Save Record</button>
         <button onclick="closeModal('manualModal')" class="btn-danger" style="margin-top:8px;">Cancel</button>
     </div>
@@ -439,28 +456,23 @@
     let currentVerifiedStaff = null;
     let cachedStaffList = [];
     let map, mapMarker;
+    let currentZoomScale = 1;
 
     const kioskVideo = document.getElementById('kioskVideo');
     const regStaffCam = document.getElementById('regStaffCam');
 
     function initMap() {
         if (!map) {
-            // Default center India (21.2514, 81.6296)
             map = L.map('map').setView([21.2514, 81.6296], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
             map.on('click', function(e) {
                 const lat = e.latlng.lat.toFixed(6);
                 const lng = e.latlng.lng.toFixed(6);
                 
-                if (mapMarker) {
-                    mapMarker.setLatLng(e.latlng);
-                } else {
-                    mapMarker = L.marker(e.latlng).addTo(map);
-                }
+                if (mapMarker) { mapMarker.setLatLng(e.latlng); } 
+                else { mapMarker = L.marker(e.latlng).addTo(map); }
+                
                 document.getElementById('locUrlInput').value = `${lat}, ${lng}`;
             });
         }
@@ -479,9 +491,7 @@
                 else { mapMarker = L.marker(userLatLng).addTo(map); }
 
                 document.getElementById('locUrlInput').value = `${lat}, ${lng}`;
-            }, function() {
-                alert('GPS location fetch fail ho gaya!');
-            });
+            }, function() { alert('GPS location fetch failed!'); });
         }
     }
 
@@ -521,9 +531,7 @@
         document.getElementById(`tab-${tabName}`).classList.add('active-section');
         element.classList.add('active');
 
-        if(tabName === 'locations') {
-            initMap();
-        }
+        if(tabName === 'locations') { initMap(); }
     }
 
     function toggleView() {
@@ -658,38 +666,28 @@
                     document.getElementById('cameraStepBox').style.display = 'none';
                     currentVerifiedStaff = null;
                     loadTodayWorkingStatus();
+                    if(isAdminLoggedIn) loadFilteredAttendanceLogs();
                 } else {
                     statusBox.innerHTML = `❌ ${result.error}`;
                 }
-            } catch(err) {
-                statusBox.innerHTML = '❌ Server Error!';
-            }
+            } catch(err) { statusBox.innerHTML = '❌ Server Error!'; }
         };
 
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    sendPunchRequest(position.coords.latitude, position.coords.longitude);
-                }, 
+                function(position) { sendPunchRequest(position.coords.latitude, position.coords.longitude); }, 
                 function(error) {
-                    let manualLat = prompt("GPS fetch fail ho gaya! Current Latitude enter karein (e.g. 21.2514):", "");
-                    let manualLng = prompt("Current Longitude enter karein (e.g. 81.6296):", "");
-                    if(manualLat && manualLng) {
-                        sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
-                    } else {
-                        statusBox.innerHTML = '❌ Location Fetching Failed & Cancelled!';
-                    }
+                    let manualLat = prompt("GPS fetch fail ho gaya! Current Latitude enter karein:", "");
+                    let manualLng = prompt("Current Longitude enter karein:", "");
+                    if(manualLat && manualLng) sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
+                    else statusBox.innerHTML = '❌ Location Fetching Failed!';
                 }, 
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
             let manualLat = prompt("Latitude enter karein:", "");
             let manualLng = prompt("Longitude enter karein:", "");
-            if(manualLat && manualLng) {
-                sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
-            } else {
-                statusBox.innerHTML = '❌ Geolocation Not Supported!';
-            }
+            if(manualLat && manualLng) sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
         }
     }
 
@@ -710,28 +708,17 @@
 
     function handleStaffPhotoSelect(e) {
         const file = e.target.files[0];
-        if(file) {
-            compressAndConvertImage(file, function(base64) {
-                registeredPhotoBase64 = base64;
-                document.getElementById('photoBadge').style.display = 'inline';
-            });
-        }
+        if(file) compressAndConvertImage(file, function(base64) { registeredPhotoBase64 = base64; document.getElementById('photoBadge').style.display = 'inline'; });
     }
 
     function handleDocSelect(e) {
         const file = e.target.files[0];
         if(file) {
             if(file.type.includes('image')) {
-                compressAndConvertImage(file, function(base64) {
-                    registeredDocBase64 = base64;
-                    document.getElementById('docBadge').style.display = 'inline';
-                }, 600, 800);
+                compressAndConvertImage(file, function(base64) { registeredDocBase64 = base64; document.getElementById('docBadge').style.display = 'inline'; }, 800, 1000);
             } else {
                 const reader = new FileReader();
-                reader.onload = function(evt) {
-                    registeredDocBase64 = evt.target.result;
-                    document.getElementById('docBadge').style.display = 'inline';
-                };
+                reader.onload = function(evt) { registeredDocBase64 = evt.target.result; document.getElementById('docBadge').style.display = 'inline'; };
                 reader.readAsDataURL(file);
             }
         }
@@ -739,22 +726,14 @@
 
     function handleEditPhotoSelect(e) {
         const file = e.target.files[0];
-        if(file) {
-            compressAndConvertImage(file, function(base64) {
-                editUpdatedPhotoBase64 = base64;
-                document.getElementById('editPhotoBadge').style.display = 'inline';
-            });
-        }
+        if(file) compressAndConvertImage(file, function(base64) { editUpdatedPhotoBase64 = base64; document.getElementById('editPhotoBadge').style.display = 'inline'; });
     }
 
     function handleEditDocSelect(e) {
         const file = e.target.files[0];
         if(file) {
             const reader = new FileReader();
-            reader.onload = function(evt) {
-                editUpdatedDocBase64 = evt.target.result;
-                document.getElementById('editDocBadge').style.display = 'inline';
-            };
+            reader.onload = function(evt) { editUpdatedDocBase64 = evt.target.result; document.getElementById('editDocBadge').style.display = 'inline'; };
             reader.readAsDataURL(file);
         }
     }
@@ -765,30 +744,20 @@
         const salaryAmount = document.getElementById('regSalary').value;
         const pin = document.getElementById('regPin').value;
 
-        if(!name || !phone || !salaryAmount || !pin) {
-            alert('Please fill Name, Phone, Salary AND 4-Digit PIN!');
-            return;
-        }
+        if(!name || !phone || !salaryAmount || !pin) { alert('Fill all fields!'); return; }
 
         try {
             const res = await fetch(`${API_URL}/staff`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    name, phone, salaryAmount, pin,
-                    photo: registeredPhotoBase64 || '',
-                    documentFile: registeredDocBase64 || ''
-                })
+                body: JSON.stringify({ name, phone, salaryAmount, pin, photo: registeredPhotoBase64 || '', documentFile: registeredDocBase64 || '' })
             });
             const data = await res.json();
             if(data.success) {
                 alert('Staff Registered Successfully!');
-                document.getElementById('regName').value = '';
-                document.getElementById('regPhone').value = '';
-                document.getElementById('regSalary').value = '';
-                document.getElementById('regPin').value = '';
-                document.getElementById('docBadge').style.display = 'none';
-                document.getElementById('photoBadge').style.display = 'none';
+                document.getElementById('regName').value = ''; document.getElementById('regPhone').value = '';
+                document.getElementById('regSalary').value = ''; document.getElementById('regPin').value = '';
+                document.getElementById('docBadge').style.display = 'none'; document.getElementById('photoBadge').style.display = 'none';
                 registeredDocBase64 = ''; registeredPhotoBase64 = '';
                 loadAdminData();
             } else { alert('Error: ' + data.error); }
@@ -806,17 +775,10 @@
         try {
             const res = await fetch(`${API_URL}/locations`);
             const result = await res.json();
-            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="4">No locations allowed yet.</td></tr>'; return; }
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="4">No locations saved.</td></tr>'; return; }
             tbody.innerHTML = '';
             result.data.forEach(loc => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>${loc.name}</strong></td>
-                        <td><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small></td>
-                        <td>${loc.radiusMeters} m</td>
-                        <td><button onclick="deleteLocation('${loc._id}')" class="btn-danger" style="padding:4px 8px; font-size:11px;">Delete</button></td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr><td><strong>${loc.name}</strong></td><td><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small></td><td>${loc.radiusMeters} m</td><td><button onclick="deleteLocation('${loc._id}')" class="btn-danger" style="padding:4px 8px; font-size:11px;">Delete</button></td></tr>`;
             });
         } catch(e) { tbody.innerHTML = '<tr><td colspan="4">Error loading locations</td></tr>'; }
     }
@@ -826,7 +788,7 @@
         const urlOrCoords = document.getElementById('locUrlInput').value;
         const radiusMeters = document.getElementById('locRadiusInput').value;
 
-        if(!name || !urlOrCoords) { alert('Please select a point on the map AND enter Location Name!'); return; }
+        if(!name || !urlOrCoords) { alert('Pin on map & enter location name!'); return; }
 
         try {
             const res = await fetch(`${API_URL}/locations`, {
@@ -836,12 +798,11 @@
             });
             const data = await res.json();
             if(data.success) {
-                alert('Allowed Location Saved Successfully!');
-                document.getElementById('locNameInput').value = '';
-                document.getElementById('locUrlInput').value = '';
+                alert('Location Saved Successfully!');
+                document.getElementById('locNameInput').value = ''; document.getElementById('locUrlInput').value = '';
                 loadAllowedLocations();
             } else { alert('Error: ' + data.error); }
-        } catch(e) { alert('Failed to add location!'); }
+        } catch(e) { alert('Failed!'); }
     }
 
     async function deleteLocation(id) {
@@ -862,8 +823,6 @@
                 tbody.innerHTML = '';
                 result.data.forEach(staff => {
                     const isActive = staff.status !== 'inactive';
-                    const statusBadgeClass = isActive ? 'bg-active' : 'bg-inactive';
-                    const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
                     const photoImg = staff.photo ? `<img src="${staff.photo}" class="thumb-img" onclick="openPreviewModal('Staff Face Photo', '${staff.photo}')">` : 'No Photo';
                     const docLink = staff.documentFile ? `<button onclick="openPreviewDocModal('${staff.name} Document', '${staff.documentFile}')" class="btn-warning" style="padding:4px 8px; font-size:11px;">📄 Preview Doc</button>` : 'No Doc';
 
@@ -875,7 +834,7 @@
                             <td>${staff.phone}</td>
                             <td>₹${staff.salaryAmount}</td>
                             <td>${docLink}</td>
-                            <td><span class="badge ${statusBadgeClass}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${statusText}</span></td>
+                            <td><span class="badge ${isActive ? 'bg-active' : 'bg-inactive'}" onclick="toggleStaffStatus('${staff._id}', '${staff.status}')">${isActive ? 'ACTIVE' : 'INACTIVE'}</span></td>
                             <td>
                                 <button onclick="openEditStaff('${staff._id}', '${staff.name}', '${staff.phone}', ${staff.salaryAmount}, '${staff.pin || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px; margin-bottom:4px;">Edit</button>
                                 <button onclick="deleteStaff('${staff._id}')" class="btn-danger" style="padding:4px 8px; font-size:12px;">Delete</button>
@@ -887,20 +846,45 @@
         } catch(err) { tbody.innerHTML = '<tr><td colspan="8">Error loading directory.</td></tr>'; }
     }
 
+    // Zoom & Download Preview Functions
     function openPreviewModal(title, imageSrc) {
+        currentZoomScale = 1;
         document.getElementById('previewTitle').innerText = title;
-        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:200px; border-radius:12px; border:3px solid #38bdf8;">`;
+        document.getElementById('zoomButtonsBox').style.display = 'flex';
+        document.getElementById('downloadBtn').href = imageSrc;
+        document.getElementById('previewBody').innerHTML = `<img id="previewImg" src="${imageSrc}" style="transform: scale(1); max-width:100%; border-radius:8px;">`;
         document.getElementById('previewModal').style.display = 'flex';
     }
 
     function openPreviewDocModal(title, docSrc) {
+        currentZoomScale = 1;
         document.getElementById('previewTitle').innerText = title;
+        document.getElementById('downloadBtn').href = docSrc;
+
         if(docSrc.startsWith('data:application/pdf')) {
-            document.getElementById('previewBody').innerHTML = `<iframe src="${docSrc}" style="width:100%; height:350px;" frameborder="0"></iframe>`;
+            document.getElementById('zoomButtonsBox').style.display = 'none';
+            document.getElementById('previewBody').innerHTML = `<iframe src="${docSrc}" style="width:100%; height:380px;" frameborder="0"></iframe>`;
         } else {
-            document.getElementById('previewBody').innerHTML = `<img src="${docSrc}" style="max-width:100%; border-radius:8px;">`;
+            document.getElementById('zoomButtonsBox').style.display = 'flex';
+            document.getElementById('previewBody').innerHTML = `<img id="previewImg" src="${docSrc}" style="transform: scale(1); max-width:100%; border-radius:8px;">`;
         }
         document.getElementById('previewModal').style.display = 'flex';
+    }
+
+    function zoomImage(amount) {
+        const img = document.getElementById('previewImg');
+        if(img) {
+            currentZoomScale += amount;
+            if(currentZoomScale < 0.4) currentZoomScale = 0.4;
+            if(currentZoomScale > 3.0) currentZoomScale = 3.0;
+            img.style.transform = `scale(${currentZoomScale})`;
+        }
+    }
+
+    function resetZoom() {
+        currentZoomScale = 1;
+        const img = document.getElementById('previewImg');
+        if(img) img.style.transform = `scale(1)`;
     }
 
     function openEditStaff(id, name, phone, salary, pin) {
@@ -934,7 +918,7 @@
             });
             const data = await res.json();
             if(data.success) {
-                alert('Staff Entry updated successfully!');
+                alert('Staff Details Updated!');
                 closeModal('editStaffModal');
                 loadStaffDirectory();
             } else { alert('Error: ' + data.error); }
@@ -943,14 +927,12 @@
 
     async function toggleStaffStatus(id, currentStatus) {
         const newStatus = (currentStatus === 'inactive') ? 'active' : 'inactive';
-        try {
-            await fetch(`${API_URL}/staff/${id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus })
-            });
-            loadStaffDirectory();
-        } catch(err) { alert('Status update failed!'); }
+        await fetch(`${API_URL}/staff/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        loadStaffDirectory();
     }
 
     async function deleteStaff(id) {
@@ -966,25 +948,34 @@
         try {
             const res = await fetch(`${API_URL}/attendance/all?month=${month}&year=${year}`);
             const result = await res.json();
-            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="8">No logs found.</td></tr>'; return; }
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="9">No logs found.</td></tr>'; return; }
             
             tbody.innerHTML = '';
             result.data.forEach(row => {
-                const photoThumb = row.punchPhoto ? `<img src="${row.punchPhoto}" class="thumb-img" onclick="openPreviewModal('Punch Face Photo', '${row.punchPhoto}')">` : 'No Photo';
+                const inPhoto = row.punchInPhoto ? `<img src="${row.punchInPhoto}" class="thumb-img" onclick="openPreviewModal('Punch IN Face Photo', '${row.punchInPhoto}')">` : 'No Image';
+                const outPhoto = row.punchOutPhoto ? `<img src="${row.punchOutPhoto}" class="thumb-img" onclick="openPreviewModal('Punch OUT Face Photo', '${row.punchOutPhoto}')">` : (row.punchOut ? 'No Image' : 'Working...');
+
+                let badgeClass = 'bg-present';
+                let statusLabel = 'FULL DAY';
+                if (row.workHours >= 8 || row.status === 'present') { statusLabel = 'FULL DAY'; badgeClass = 'bg-completed'; }
+                else if (row.workHours >= 4 || row.status === 'half_day') { statusLabel = 'HALF DAY'; badgeClass = 'bg-halfday'; }
+                else { statusLabel = 'ABSENT'; badgeClass = 'bg-absent'; }
+
                 tbody.innerHTML += `
                     <tr>
-                        <td>${photoThumb}</td>
+                        <td>${inPhoto}</td>
+                        <td>${outPhoto}</td>
                         <td>${row.date}</td>
                         <td><strong>${row.staffId ? row.staffId.name : 'N/A'}</strong></td>
                         <td><span style="color:#10b981; font-weight:bold;">${row.punchIn || 'N/A'}</span></td>
                         <td><span style="color:#38bdf8; font-weight:bold;">${row.punchOut || 'N/A'}</span></td>
                         <td>${row.workHours || 0} hrs</td>
-                        <td><span class="badge bg-present">${row.status.toUpperCase()}</span></td>
+                        <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
                         <td><button onclick="openEditPunchModal('${row._id}', '${row.punchIn || ''}', '${row.punchOut || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px;">Edit Time</button></td>
                     </tr>
                 `;
             });
-        } catch(err) { tbody.innerHTML = '<tr><td colspan="8">Error loading logs.</td></tr>'; }
+        } catch(err) { tbody.innerHTML = '<tr><td colspan="9">Error loading logs.</td></tr>'; }
     }
 
     function openEditPunchModal(id, punchIn, punchOut) {
@@ -1011,7 +1002,7 @@
                 closeModal('editPunchModal');
                 loadFilteredAttendanceLogs();
             } else { alert('Error: ' + data.error); }
-        } catch(err) { alert('Failed to update punch time!'); }
+        } catch(err) { alert('Failed!'); }
     }
 
     async function calculateSalarySheet() {
@@ -1022,7 +1013,7 @@
         try {
             const res = await fetch(`${API_URL}/salary/monthly-report?month=${month}&year=${year}`);
             const result = await res.json();
-            if(!result.data || !result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No active staff salary records found.</td></tr>'; return; }
+            if(!result.data || !result.data.length) { tbody.innerHTML = '<tr><td colspan="6">No active staff records found.</td></tr>'; return; }
 
             tbody.innerHTML = '';
             result.data.forEach(item => {
@@ -1048,10 +1039,12 @@
             if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No check-ins today.</td></tr>'; return; }
             tbody.innerHTML = '';
             result.data.forEach(row => {
-                let statusLabel = row.status.toUpperCase();
+                let statusLabel = 'WORKING...';
                 let badgeClass = 'bg-present';
-                if(row.workHours >= 8) { statusLabel = 'SHIFT COMPLETED'; badgeClass = 'bg-completed'; }
-                else if(row.workHours > 0 && row.workHours < 5) { statusLabel = 'HALF DAY'; badgeClass = 'bg-halfday'; }
+
+                if(row.workHours >= 8) { statusLabel = 'FULL DAY (8+ hrs)'; badgeClass = 'bg-completed'; }
+                else if(row.workHours >= 4) { statusLabel = 'HALF DAY (4-8 hrs)'; badgeClass = 'bg-halfday'; }
+                else if(row.punchOut && row.workHours < 4) { statusLabel = 'ABSENT (<4 hrs)'; badgeClass = 'bg-absent'; }
 
                 tbody.innerHTML += `
                     <tr>
@@ -1100,14 +1093,16 @@
         const month = document.getElementById('salMonth').value;
         const year = document.getElementById('salYear').value;
 
-        if(format === 'excel') {
-            window.open(`${API_URL}/export/salary-csv?month=${month}&year=${year}`, '_blank');
-        } else if(format === 'pdf') {
-            window.print();
-        }
+        if(format === 'excel') window.open(`${API_URL}/export/salary-csv?month=${month}&year=${year}`, '_blank');
+        else if(format === 'pdf') window.print();
     }
 
+    // Auto Refresh Every 10 Seconds
     loadTodayWorkingStatus();
+    setInterval(() => {
+        loadTodayWorkingStatus();
+        if(isAdminLoggedIn) loadFilteredAttendanceLogs();
+    }, 10000);
 </script>
 
 </body>

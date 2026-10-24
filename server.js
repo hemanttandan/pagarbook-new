@@ -57,9 +57,10 @@ const attendanceSchema = new mongoose.Schema({
   date: { type: String, required: true },
   punchIn: { type: String },
   punchOut: { type: String },
-  punchPhoto: { type: String },
+  punchInPhoto: { type: String },
+  punchOutPhoto: { type: String },
   workHours: { type: Number, default: 0 },
-  status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'present' }
+  status: { type: String, enum: ['present', 'absent', 'half_day'], default: 'absent' }
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
@@ -71,31 +72,18 @@ async function initAdminPassword() {
 }
 initAdminPassword();
 
-// Robust Coordinate Parser for URLs and Lat/Lng strings
 function parseCoordinates(inputStr) {
     if (!inputStr) return null;
     const str = String(inputStr).trim();
-
-    // Direct Lat, Lng format e.g., "21.2514, 81.6296" or "21.2514,81.6296"
     const directMatch = str.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
     if (directMatch) {
         return { lat: parseFloat(directMatch[1]), lng: parseFloat(directMatch[2]) };
     }
-
-    // Google Maps URL pattern e.g., @21.2514,81.6296 or q=21.2514,81.6296
-    const mapsMatch = str.match(/([@-]?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-    if (mapsMatch) {
-        let lat = parseFloat(mapsMatch[1].replace('@', ''));
-        let lng = parseFloat(mapsMatch[2]);
-        if(!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-    }
-
     return null;
 }
 
-// Distance calculation using Haversine formula
 function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Radius of Earth in meters
+  const R = 6371000;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180); 
   const a = 
@@ -108,14 +96,12 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 
 async function isWithinAllowedLocations(userLat, userLng) {
     const locations = await Location.find();
-    if (!locations.length) return true; // If no location restricted in Admin, allow everywhere
+    if (!locations.length) return true;
 
     for (let loc of locations) {
         let distMeters = getDistanceFromLatLonInMeters(userLat, userLng, loc.lat, loc.lng);
         let allowedRadius = loc.radiusMeters || 500;
-        if (distMeters <= allowedRadius) {
-            return true;
-        }
+        if (distMeters <= allowedRadius) return true;
     }
     return false;
 }
@@ -161,11 +147,8 @@ app.post('/api/admin/verify', async (req, res) => {
     try {
         let adminSetting = await Settings.findOne({ key: 'adminPassword' });
         const currentPwd = adminSetting ? adminSetting.value : '1234';
-        if (password === currentPwd) {
-            res.json({ success: true });
-        } else {
-            res.status(401).json({ success: false, error: 'Incorrect Password' });
-        }
+        if (password === currentPwd) res.json({ success: true });
+        else res.status(401).json({ success: false, error: 'Incorrect Password' });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -188,7 +171,7 @@ app.post('/api/locations', async (req, res) => {
   const { name, urlOrCoords, radiusMeters } = req.body;
   try {
     const coords = parseCoordinates(urlOrCoords);
-    if (!coords) return res.status(400).json({ success: false, error: "Invalid Lat, Lng or Google Maps URL format!" });
+    if (!coords) return res.status(400).json({ success: false, error: "Invalid Coordinates!" });
 
     const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: Number(radiusMeters) || 500 });
     await loc.save();
@@ -251,9 +234,7 @@ app.post('/api/verify-pin', async (req, res) => {
   const { pin } = req.body;
   try {
     const matchedStaff = await Staff.findOne({ pin, status: 'active' });
-    if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Incorrect PIN or Staff Inactive!' });
-    }
+    if (!matchedStaff) return res.status(404).json({ success: false, error: 'Incorrect PIN or Inactive!' });
     res.json({ success: true, data: { name: matchedStaff.name, phone: matchedStaff.phone } });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
@@ -261,22 +242,11 @@ app.post('/api/verify-pin', async (req, res) => {
 app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
   const { pin, lat, lng, photo } = req.body;
   try {
-    if (lat === undefined || lng === undefined || isNaN(Number(lat)) || isNaN(Number(lng))) {
-        return res.status(400).json({ success: false, error: 'Invalid Geolocation Coordinates!' });
-    }
-
     const allowed = await isWithinAllowedLocations(Number(lat), Number(lng));
-    if (!allowed) {
-        return res.status(403).json({ 
-            success: false, 
-            error: 'Punch Rejected! You are outside allowed office locations!' 
-        });
-    }
+    if (!allowed) return res.status(403).json({ success: false, error: 'Outside allowed location!' });
 
     const matchedStaff = await Staff.findOne({ pin, status: 'active' });
-    if (!matchedStaff) {
-        return res.status(404).json({ success: false, error: 'Incorrect PIN or Staff Inactive!' });
-    }
+    if (!matchedStaff) return res.status(404).json({ success: false, error: 'Incorrect PIN or Inactive!' });
 
     const today = new Date().toISOString().split('T')[0];
     const timeNow = getIndianCurrentTime();
@@ -285,15 +255,18 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
     let punchType = 'IN';
 
     if (!record) {
-      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, punchPhoto: photo, status: 'present' });
+      record = new Attendance({ staffId: matchedStaff._id, date: today, punchIn: timeNow, punchInPhoto: photo, status: 'absent' });
       await record.save();
-      appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,PRESENT`);
+      appendToExcelLedger(`IN,${matchedStaff.name},${matchedStaff.phone},${today},${timeNow},N/A,0,ABSENT`);
     } else if (!record.punchOut) {
       punchType = 'OUT';
       record.punchOut = timeNow;
+      record.punchOutPhoto = photo;
       record.workHours = calculateHours(record.punchIn, timeNow);
-      if (record.workHours < 5) record.status = 'half_day';
-      else record.status = 'present';
+
+      if (record.workHours >= 8) record.status = 'present';
+      else if (record.workHours >= 4) record.status = 'half_day';
+      else record.status = 'absent';
 
       await record.save();
       appendToExcelLedger(`OUT,${matchedStaff.name},${matchedStaff.phone},${today},${record.punchIn},${timeNow},${record.workHours},${record.status}`);
@@ -301,10 +274,7 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
       return res.status(400).json({ success: false, error: `Today's IN & OUT completed for ${matchedStaff.name}!` });
     }
 
-    res.json({
-      success: true,
-      data: { staffName: matchedStaff.name, type: punchType, time: timeNow, workHours: record.workHours }
-    });
+    res.json({ success: true, data: { staffName: matchedStaff.name, type: punchType, time: timeNow, workHours: record.workHours } });
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
@@ -331,8 +301,9 @@ app.post('/api/attendance/edit-time', async (req, res) => {
     record.punchOut = punchOut;
     if (punchIn && punchOut) {
         record.workHours = calculateHours(punchIn, punchOut);
-        if (record.workHours < 5) record.status = 'half_day';
-        else record.status = 'present';
+        if (record.workHours >= 8) record.status = 'present';
+        else if (record.workHours >= 4) record.status = 'half_day';
+        else record.status = 'absent';
     }
     await record.save();
     res.json({ success: true, data: record });
@@ -353,21 +324,13 @@ app.get('/api/attendance/all', async (req, res) => {
     let query = {};
     let dateRegexStr = "";
 
-    if (year && year !== 'ALL') {
-        dateRegexStr += year;
-    } else {
-        dateRegexStr += ".*";
-    }
+    if (year && year !== 'ALL') dateRegexStr += year;
+    else dateRegexStr += ".*";
 
-    if (month && month !== 'ALL') {
-        dateRegexStr += `-${month.padStart(2, '0')}-`;
-    } else {
-        dateRegexStr += "-.*-";
-    }
+    if (month && month !== 'ALL') dateRegexStr += `-${month.padStart(2, '0')}-`;
+    else dateRegexStr += "-.*-";
 
-    if (month !== 'ALL' || year !== 'ALL') {
-        query.date = { $regex: dateRegexStr };
-    }
+    if (month !== 'ALL' || year !== 'ALL') query.date = { $regex: dateRegexStr };
 
     const logs = await Attendance.find(query).populate('staffId').sort({ date: -1 });
     res.json({ success: true, data: logs });
@@ -394,7 +357,7 @@ app.get('/api/salary/monthly-report', async (req, res) => {
 
       logs.forEach(log => {
         if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
-        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
+        else if (log.workHours >= 4 || log.status === 'half_day') halfDays += 1;
       });
 
       const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
@@ -439,7 +402,7 @@ app.get('/api/export/salary-csv', async (req, res) => {
 
       logs.forEach(log => {
         if (log.workHours >= 8 || log.status === 'present') shiftCompletedDays += 1;
-        else if (log.workHours > 0 || log.status === 'half_day') halfDays += 1;
+        else if (log.workHours >= 4 || log.status === 'half_day') halfDays += 1;
       });
 
       const totalEffectiveDays = shiftCompletedDays + (halfDays * 0.5);
