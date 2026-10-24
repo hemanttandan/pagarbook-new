@@ -71,35 +71,51 @@ async function initAdminPassword() {
 }
 initAdminPassword();
 
+// Robust Coordinate Parser for URLs and Lat/Lng strings
 function parseCoordinates(inputStr) {
     if (!inputStr) return null;
-    const coordMatch = inputStr.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-    if (coordMatch) {
-        return { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
+    const str = String(inputStr).trim();
+
+    // Direct Lat, Lng format e.g., "21.2514, 81.6296" or "21.2514,81.6296"
+    const directMatch = str.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    if (directMatch) {
+        return { lat: parseFloat(directMatch[1]), lng: parseFloat(directMatch[2]) };
     }
-    return { lat: 21.2514, lng: 81.6296 };
+
+    // Google Maps URL pattern e.g., @21.2514,81.6296 or q=21.2514,81.6296
+    const mapsMatch = str.match(/([@-]?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    if (mapsMatch) {
+        let lat = parseFloat(mapsMatch[1].replace('@', ''));
+        let lng = parseFloat(mapsMatch[2]);
+        if(!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+
+    return null;
 }
 
-function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-  var R = 6371;
-  var dLat = (lat2-lat1) * (Math.PI/180);
-  var dLon = (lon2-lon1) * (Math.PI/180); 
-  var a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2); 
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+// Distance calculation using Haversine formula
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Radius of Earth in meters
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180); 
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
   return R * c; 
 }
 
 async function isWithinAllowedLocations(userLat, userLng) {
     const locations = await Location.find();
-    if (!locations.length) return true;
+    if (!locations.length) return true; // If no location restricted in Admin, allow everywhere
 
     for (let loc of locations) {
-        let distKm = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
-        let distMeters = distKm * 1000;
-        if (distMeters <= (loc.radiusMeters || 500)) return true;
+        let distMeters = getDistanceFromLatLonInMeters(userLat, userLng, loc.lat, loc.lng);
+        let allowedRadius = loc.radiusMeters || 500;
+        if (distMeters <= allowedRadius) {
+            return true;
+        }
     }
     return false;
 }
@@ -172,9 +188,9 @@ app.post('/api/locations', async (req, res) => {
   const { name, urlOrCoords, radiusMeters } = req.body;
   try {
     const coords = parseCoordinates(urlOrCoords);
-    if (!coords) return res.status(400).json({ success: false, error: "Invalid Coordinates or Link!" });
+    if (!coords) return res.status(400).json({ success: false, error: "Invalid Lat, Lng or Google Maps URL format!" });
 
-    const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: radiusMeters || 500 });
+    const loc = new Location({ name, lat: coords.lat, lng: coords.lng, radiusMeters: Number(radiusMeters) || 500 });
     await loc.save();
     res.status(201).json({ success: true, data: loc });
   } catch(e) { res.status(400).json({ success: false, error: e.message }); }
@@ -245,7 +261,11 @@ app.post('/api/verify-pin', async (req, res) => {
 app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
   const { pin, lat, lng, photo } = req.body;
   try {
-    const allowed = await isWithinAllowedLocations(lat, lng);
+    if (lat === undefined || lng === undefined || isNaN(Number(lat)) || isNaN(Number(lng))) {
+        return res.status(400).json({ success: false, error: 'Invalid Geolocation Coordinates!' });
+    }
+
+    const allowed = await isWithinAllowedLocations(Number(lat), Number(lng));
     if (!allowed) {
         return res.status(403).json({ 
             success: false, 

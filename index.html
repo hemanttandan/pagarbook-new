@@ -13,7 +13,6 @@
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .nav-btn:hover { background: #0369a1; }
         
-        /* Layout with Collapsible Sidebar */
         .admin-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
         @media(max-width: 768px) { .admin-layout { grid-template-columns: 1fr; } }
 
@@ -36,8 +35,8 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        video { width: 180px; height: 220px; object-fit: cover; border-radius: 50%; border: 3px solid #38bdf8; display: block; margin: 0 auto; transform: scaleX(-1); background: #000; }
-        #regStaffCam { width: 160px; height: 200px; border-radius: 12px; border: 2px solid #38bdf8; object-fit: cover; margin-bottom: 8px; display: block; margin-left: auto; margin-right: auto; transform: scaleX(-1); }
+        /* Unified Camera Card Style for Staff Register & Staff Punch */
+        .cam-preview-box { width: 220px; height: 260px; border-radius: 12px; border: 2px solid #38bdf8; object-fit: cover; margin: 10px auto; display: block; transform: scaleX(-1); background: #000; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
@@ -93,12 +92,11 @@
                     <h2 id="verifiedStaffName" style="color:#34d399; margin:4px 0;">-</h2>
                 </div>
 
+                <!-- Camera Container in Registration Style -->
                 <div id="cameraStepBox" style="display:none;">
-                    <h3>📸 Step 2: Capture Passport Face</h3>
-                    <div style="margin: 10px 0;">
-                        <video id="kioskVideo" autoplay playsinline></video>
-                    </div>
-                    <button onclick="captureAndSubmitPunch()" class="btn-success" style="padding:12px; font-size:16px; margin-top:10px;">📷 Capture Face & Submit Punch</button>
+                    <h3>📸 Step 2: Capture Face Photo</h3>
+                    <video id="kioskVideo" class="cam-preview-box" autoplay playsinline></video>
+                    <button onclick="captureAndSubmitPunch()" class="btn-success" style="padding:12px; font-size:16px; margin-top:5px;">📷 Capture Face & Submit Punch</button>
                 </div>
 
                 <div id="punchStatusBox" class="status-box" style="display:none; text-align:left;"></div>
@@ -139,7 +137,6 @@
         </div>
 
         <div class="admin-layout">
-            <!-- Sidebar Navigation -->
             <div class="sidebar no-print">
                 <div class="menu-item active" onclick="switchAdminTab('locations', this)">📍 Allowed Locations</div>
                 <div class="menu-item" onclick="switchAdminTab('regStaff', this)">➕ Register Staff</div>
@@ -148,22 +145,21 @@
                 <div class="menu-item" onclick="switchAdminTab('salary', this)">💰 Salary Sheet</div>
             </div>
 
-            <!-- Tab Content Area -->
             <div>
                 <!-- TAB 1: LOCATIONS -->
                 <div id="tab-locations" class="section active-section" style="border:1px solid #38bdf8;">
                     <h3>📍 Manage Allowed Office Locations (Geofencing)</h3>
-                    <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Lat,Lng coordinates daal kar office locations allow karein</p>
+                    <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Coordinates (Latitude, Longitude) enter karein</p>
                     
                     <div class="grid-2">
                         <div>
                             <div class="form-group">
                                 <label>Location Name:</label>
-                                <input type="text" id="locNameInput" placeholder="Enter Location Name">
+                                <input type="text" id="locNameInput" placeholder="e.g. Main Office / Branch 1">
                             </div>
                             <div class="form-group">
-                                <label>Google Maps URL or Lat,Lng:</label>
-                                <input type="text" id="locUrlInput" placeholder="e.g. https://maps.app.goo.gl/... or 21.2514,81.6296">
+                                <label>Google Maps Link or Lat, Lng:</label>
+                                <input type="text" id="locUrlInput" placeholder="e.g. 21.2514, 81.6296 or https://maps.app.goo.gl/...">
                             </div>
                             <div class="form-group">
                                 <label>Allowed Radius (Meters):</label>
@@ -172,14 +168,14 @@
                             <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
                         </div>
                         <div>
-                            <label>Allowed Locations List:</label>
-                            <div style="max-height:200px; overflow-y:auto;">
+                            <label>Currently Allowed Locations:</label>
+                            <div style="max-height:220px; overflow-y:auto;">
                                 <table>
                                     <thead>
-                                        <tr><th>Name</th><th>Radius</th><th>Action</th></tr>
+                                        <tr><th>Name</th><th>Coords</th><th>Radius</th><th>Action</th></tr>
                                     </thead>
                                     <tbody id="allowedLocationsTable">
-                                        <tr><td colspan="3">Loading...</td></tr>
+                                        <tr><td colspan="4">Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -212,7 +208,7 @@
                         <div style="text-align:center;">
                             <div class="form-group">
                                 <label style="text-align:left;">Staff Passport Face Photo:</label>
-                                <video id="regStaffCam" autoplay playsinline style="display:none;"></video>
+                                <video id="regStaffCam" class="cam-preview-box" autoplay playsinline style="display:none;"></video>
                                 <div style="display:flex; gap:5px; justify-content:center; margin-bottom:5px;">
                                     <button type="button" onclick="startRegCamera()" class="btn-warning" style="padding:6px; font-size:12px; width:auto;">📷 Open Camera</button>
                                     <button type="button" onclick="captureRegCamera()" id="regCapBtn" class="btn-success" style="display:none; padding:6px; font-size:12px; width:auto;">📸 Capture</button>
@@ -457,7 +453,7 @@
         ctx.drawImage(regStaffCam, 0, 0, canvas.width, canvas.height);
         registeredPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
         document.getElementById('photoBadge').style.display = 'inline';
-        alert('✅ Passport Face Photo Captured!');
+        alert('✅ Face Photo Captured!');
     }
 
     function switchAdminTab(tabName, element) {
@@ -576,7 +572,7 @@
         if(!currentVerifiedStaff || !pin) { alert('Please enter valid PIN first!'); return; }
 
         const canvas = document.getElementById('kioskCanvas');
-        canvas.width = 240; canvas.height = 300;
+        canvas.width = 300; canvas.height = 360;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(kioskVideo, 0, 0, canvas.width, canvas.height);
         const capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
@@ -613,19 +609,19 @@
                     sendPunchRequest(position.coords.latitude, position.coords.longitude);
                 }, 
                 function(error) {
-                    let manualLat = prompt("GPS location fetch nahi ho paayi! Office ki Latitude dalein:", "21.2514");
-                    let manualLng = prompt("Office ki Longitude dalein:", "81.6296");
+                    let manualLat = prompt("GPS fetch fail ho gaya! Current Latitude enter karein (e.g. 21.2514):", "");
+                    let manualLng = prompt("Current Longitude enter karein (e.g. 81.6296):", "");
                     if(manualLat && manualLng) {
                         sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
                     } else {
-                        statusBox.innerHTML = '❌ Location Access Denied & Manual Entry Cancelled!';
+                        statusBox.innerHTML = '❌ Location Fetching Failed & Cancelled!';
                     }
                 }, 
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
-            let manualLat = prompt("Latitude dalein:", "21.2514");
-            let manualLng = prompt("Longitude dalein:", "81.6296");
+            let manualLat = prompt("Latitude enter karein:", "");
+            let manualLng = prompt("Longitude enter karein:", "");
             if(manualLat && manualLng) {
                 sendPunchRequest(parseFloat(manualLat), parseFloat(manualLng));
             } else {
@@ -747,18 +743,19 @@
         try {
             const res = await fetch(`${API_URL}/locations`);
             const result = await res.json();
-            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="3">No locations allowed yet.</td></tr>'; return; }
+            if(!result.data.length) { tbody.innerHTML = '<tr><td colspan="4">No locations allowed yet.</td></tr>'; return; }
             tbody.innerHTML = '';
             result.data.forEach(loc => {
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${loc.name}</strong></td>
+                        <td><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small></td>
                         <td>${loc.radiusMeters} m</td>
                         <td><button onclick="deleteLocation('${loc._id}')" class="btn-danger" style="padding:4px 8px; font-size:11px;">Delete</button></td>
                     </tr>
                 `;
             });
-        } catch(e) { tbody.innerHTML = '<tr><td colspan="3">Error loading locations</td></tr>'; }
+        } catch(e) { tbody.innerHTML = '<tr><td colspan="4">Error loading locations</td></tr>'; }
     }
 
     async function addAllowedLocation() {
@@ -766,7 +763,7 @@
         const urlOrCoords = document.getElementById('locUrlInput').value;
         const radiusMeters = document.getElementById('locRadiusInput').value;
 
-        if(!name || !urlOrCoords) { alert('Please enter Location Name and Google Maps Link / Coordinates!'); return; }
+        if(!name || !urlOrCoords) { alert('Please enter Location Name AND Coordinates/Maps Link!'); return; }
 
         try {
             const res = await fetch(`${API_URL}/locations`, {
@@ -829,7 +826,7 @@
 
     function openPreviewModal(title, imageSrc) {
         document.getElementById('previewTitle').innerText = title;
-        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:200px; border-radius:50%; border:3px solid #38bdf8;">`;
+        document.getElementById('previewBody').innerHTML = `<img src="${imageSrc}" style="max-width:200px; border-radius:12px; border:3px solid #38bdf8;">`;
         document.getElementById('previewModal').style.display = 'flex';
     }
 
