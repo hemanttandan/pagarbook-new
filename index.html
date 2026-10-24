@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance & Payroll App</title>
+    <!-- Leaflet Interactive Maps CSS & JS (Free Map Pinning) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
@@ -35,9 +39,12 @@
         .btn-warning { background: #f59e0b; } .btn-warning:hover { background: #d97706; }
         .btn-success { background: #10b981; } .btn-success:hover { background: #059669; }
 
-        /* Unified Camera Card Style for Staff Register & Staff Punch */
+        /* Camera Box Style */
         .cam-preview-box { width: 220px; height: 260px; border-radius: 12px; border: 2px solid #38bdf8; object-fit: cover; margin: 10px auto; display: block; transform: scaleX(-1); background: #000; }
         
+        /* Interactive Map Container */
+        #map { width: 100%; height: 260px; border-radius: 8px; border: 2px solid #38bdf8; margin-bottom: 10px; z-index: 1; }
+
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
         th { background: #0f172a; color: #38bdf8; }
@@ -92,7 +99,6 @@
                     <h2 id="verifiedStaffName" style="color:#34d399; margin:4px 0;">-</h2>
                 </div>
 
-                <!-- Camera Container in Registration Style -->
                 <div id="cameraStepBox" style="display:none;">
                     <h3>📸 Step 2: Capture Face Photo</h3>
                     <video id="kioskVideo" class="cam-preview-box" autoplay playsinline></video>
@@ -146,30 +152,39 @@
             </div>
 
             <div>
-                <!-- TAB 1: LOCATIONS -->
+                <!-- TAB 1: LOCATIONS WITH MAP PIN -->
                 <div id="tab-locations" class="section active-section" style="border:1px solid #38bdf8;">
-                    <h3>📍 Manage Allowed Office Locations (Geofencing)</h3>
-                    <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Google Maps Link ya Coordinates (Latitude, Longitude) enter karein</p>
-                    
+                    <h3>📍 Set Office Location on Map</h3>
+                    <p style="font-size:12px; color:#94a3b8; margin-bottom:10px;">Map par click karke exact location **Pin** karein ya **"Use My Location"** button dabayein.</p>
+
                     <div class="grid-2">
                         <div>
+                            <!-- MAP DISPLAY -->
+                            <div id="map"></div>
+
+                            <button type="button" onclick="useCurrentLocationOnMap()" class="btn-warning" style="margin-bottom:10px; font-size:13px; padding:8px;">🎯 Use My Current Location</button>
+
                             <div class="form-group">
                                 <label>Location Name:</label>
-                                <input type="text" id="locNameInput" placeholder="e.g. Main Office / Branch 1">
+                                <input type="text" id="locNameInput" placeholder="e.g. Head Office / Site A">
                             </div>
+
                             <div class="form-group">
-                                <label>Google Maps Link or Lat, Lng:</label>
-                                <input type="text" id="locUrlInput" placeholder="e.g. 21.2514, 81.6296 or https://maps.app.goo.gl/...">
+                                <label>Pinned Coordinates (Lat, Lng):</label>
+                                <input type="text" id="locUrlInput" placeholder="Click on map to pin" readonly style="background:#1e293b; color:#38bdf8; font-weight:bold;">
                             </div>
+
                             <div class="form-group">
                                 <label>Allowed Radius (Meters):</label>
                                 <input type="number" id="locRadiusInput" value="500">
                             </div>
-                            <button onclick="addAllowedLocation()" class="btn-success">➕ Add Allowed Location</button>
+
+                            <button onclick="addAllowedLocation()" class="btn-success">➕ Save Allowed Location</button>
                         </div>
+
                         <div>
-                            <label>Currently Allowed Locations:</label>
-                            <div style="max-height:220px; overflow-y:auto;">
+                            <label>Currently Saved Office Locations:</label>
+                            <div style="max-height:350px; overflow-y:auto;">
                                 <table>
                                     <thead>
                                         <tr><th>Name</th><th>Coords</th><th>Radius</th><th>Action</th></tr>
@@ -423,9 +438,52 @@
     let editUpdatedDocBase64 = '';
     let currentVerifiedStaff = null;
     let cachedStaffList = [];
+    let map, mapMarker;
 
     const kioskVideo = document.getElementById('kioskVideo');
     const regStaffCam = document.getElementById('regStaffCam');
+
+    function initMap() {
+        if (!map) {
+            // Default center India (21.2514, 81.6296)
+            map = L.map('map').setView([21.2514, 81.6296], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            map.on('click', function(e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+                
+                if (mapMarker) {
+                    mapMarker.setLatLng(e.latlng);
+                } else {
+                    mapMarker = L.marker(e.latlng).addTo(map);
+                }
+                document.getElementById('locUrlInput').value = `${lat}, ${lng}`;
+            });
+        }
+        setTimeout(() => { map.invalidateSize(); }, 300);
+    }
+
+    function useCurrentLocationOnMap() {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                const lat = pos.coords.latitude.toFixed(6);
+                const lng = pos.coords.longitude.toFixed(6);
+                const userLatLng = [lat, lng];
+
+                map.setView(userLatLng, 16);
+                if (mapMarker) { mapMarker.setLatLng(userLatLng); }
+                else { mapMarker = L.marker(userLatLng).addTo(map); }
+
+                document.getElementById('locUrlInput').value = `${lat}, ${lng}`;
+            }, function() {
+                alert('GPS location fetch fail ho gaya!');
+            });
+        }
+    }
 
     function initCameras() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -462,6 +520,10 @@
 
         document.getElementById(`tab-${tabName}`).classList.add('active-section');
         element.classList.add('active');
+
+        if(tabName === 'locations') {
+            initMap();
+        }
     }
 
     function toggleView() {
@@ -493,6 +555,7 @@
                 document.getElementById('toggleViewBtn').innerText = '📱 Staff Kiosk Mode';
                 document.getElementById('viewSubtitle').innerText = 'Admin Management Dashboard';
                 loadAdminData();
+                initMap();
             } else { alert('❌ Incorrect Password!'); }
         } catch(e) { alert('Login error!'); }
     }
@@ -763,7 +826,7 @@
         const urlOrCoords = document.getElementById('locUrlInput').value;
         const radiusMeters = document.getElementById('locRadiusInput').value;
 
-        if(!name || !urlOrCoords) { alert('Please enter Location Name AND Coordinates/Maps Link!'); return; }
+        if(!name || !urlOrCoords) { alert('Please select a point on the map AND enter Location Name!'); return; }
 
         try {
             const res = await fetch(`${API_URL}/locations`, {
@@ -773,7 +836,7 @@
             });
             const data = await res.json();
             if(data.success) {
-                alert('Allowed Location Added Successfully!');
+                alert('Allowed Location Saved Successfully!');
                 document.getElementById('locNameInput').value = '';
                 document.getElementById('locUrlInput').value = '';
                 loadAllowedLocations();
