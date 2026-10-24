@@ -26,6 +26,12 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => console.log('❌ Connection Error:', err));
 
 // Database Schemas
+const settingsSchema = new mongoose.Schema({
+  key: { type: String, unique: true },
+  value: { type: String }
+});
+const Settings = mongoose.model('Settings', settingsSchema);
+
 const locationSchema = new mongoose.Schema({
   name: { type: String, required: true },
   lat: { type: Number, required: true },
@@ -57,6 +63,14 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
+async function initAdminPassword() {
+    let adminSetting = await Settings.findOne({ key: 'adminPassword' });
+    if (!adminSetting) {
+        await Settings.create({ key: 'adminPassword', value: '1234' });
+    }
+}
+initAdminPassword();
+
 function parseCoordinates(inputStr) {
     if (!inputStr) return null;
     const coordMatch = inputStr.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
@@ -80,7 +94,7 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 
 async function isWithinAllowedLocations(userLat, userLng) {
     const locations = await Location.find();
-    if (!locations.length) return true; // Default allow if no locations added yet
+    if (!locations.length) return true;
 
     for (let loc of locations) {
         let distKm = getDistanceFromLatLonInKm(userLat, userLng, loc.lat, loc.lng);
@@ -125,6 +139,27 @@ function calculateHours(time1, time2) {
 }
 
 // ---------------- API ENDPOINTS ----------------
+
+app.post('/api/admin/verify', async (req, res) => {
+    const { password } = req.body;
+    try {
+        let adminSetting = await Settings.findOne({ key: 'adminPassword' });
+        const currentPwd = adminSetting ? adminSetting.value : '1234';
+        if (password === currentPwd) {
+            res.json({ success: true });
+        } else {
+            res.status(401).json({ success: false, error: 'Incorrect Password' });
+        }
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.put('/api/admin/update-password', async (req, res) => {
+    const { newPassword } = req.body;
+    try {
+        await Settings.findOneAndUpdate({ key: 'adminPassword' }, { value: newPassword }, { upsert: true });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
 
 app.get('/api/locations', async (req, res) => {
   try {
