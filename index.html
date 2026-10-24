@@ -12,6 +12,11 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
         .container { max-width: 1200px; margin: auto; }
         header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid #06b6d4; }
+        
+        /* App Logo Styling */
+        .header-logo-box { display: flex; align-items: center; gap: 15px; }
+        .app-logo { width: 45px; height: 45px; border-radius: 8px; object-fit: contain; border: 1px solid #38bdf8; background: #0f172a; padding: 2px; }
+        
         h1, h2, h3 { margin: 0; color: #38bdf8; }
         .nav-btn { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .nav-btn:hover { background: #0369a1; }
@@ -45,24 +50,24 @@
         th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 14px; vertical-align: middle; }
         th { background: #0f172a; color: #38bdf8; }
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
-        .bg-present { background: #065f46; color: #34d399; }
-        .bg-completed { background: #0284c7; color: #e0f2fe; }
+        .bg-present { background: #0284c7; color: #e0f2fe; }
+        .bg-completed { background: #065f46; color: #34d399; }
         .bg-halfday { background: #92400e; color: #fcd34d; }
         .bg-absent { background: #991b1b; color: #fca5a5; }
         .bg-active { background: #065f46; color: #34d399; cursor: pointer; }
         .bg-inactive { background: #991b1b; color: #fca5a5; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 550px; text-align: left; position: relative; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 600px; text-align: left; position: relative; }
         
         .thumb-img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; cursor: pointer; }
         .status-box { text-align: center; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; margin-top: 10px; font-weight: bold; }
 
-        /* Zoom Container Styles */
+        /* Document HD Preview & Zoom Styles */
         .zoom-controls { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
         .zoom-controls button { width: auto; padding: 6px 12px; font-size: 12px; }
-        .img-zoom-container { overflow: auto; max-height: 380px; text-align: center; background: #000; padding: 10px; border-radius: 8px; }
-        .img-zoom-container img { transition: transform 0.2s ease; max-width: 100%; display: inline-block; }
+        .img-zoom-container { overflow: auto; max-height: 420px; text-align: center; background: #000; padding: 10px; border-radius: 8px; }
+        .img-zoom-container img { transition: transform 0.2s ease; max-width: 100%; display: inline-block; image-rendering: -webkit-optimize-contrast; }
 
         @media print {
             body * { visibility: hidden; }
@@ -77,9 +82,13 @@
 
 <div class="container">
     <header class="no-print">
-        <div>
-            <h1>📱 Attendance App</h1>
-            <small style="color:#94a3b8;" id="viewSubtitle">PIN + Face Capture + GPS Verification Kiosk</small>
+        <div class="header-logo-box">
+            <!-- App Logo Integration -->
+            <img src="logo.png" id="appMainLogo" class="app-logo" alt="Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+            <div>
+                <h1>Attendance App</h1>
+                <small style="color:#94a3b8;" id="viewSubtitle">PIN + Face Capture + GPS Verification Kiosk</small>
+            </div>
         </div>
         <div>
             <button class="nav-btn" id="toggleViewBtn" onclick="toggleView()">🔑 Admin Login</button>
@@ -234,9 +243,9 @@
                                 <span id="photoBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Face Photo Ready</span>
                             </div>
                             <div class="form-group" style="text-align:left;">
-                                <label>Attach Document (Aadhaar/PAN/PDF):</label>
-                                <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleDocSelect(event)">
-                                <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ Document Attached</span>
+                                <label>Attach Document (HD Aadhaar/PAN/PDF):</label>
+                                <input type="file" id="regDocInput" accept="image/*,.pdf" onchange="handleHDDocSelect(event)">
+                                <span id="docBadge" style="display:none; color:#10b981; font-size:12px; font-weight:bold;">✅ HD Document Attached</span>
                             </div>
                         </div>
                     </div>
@@ -249,7 +258,7 @@
                     <div style="overflow-x: auto;">
                         <table>
                             <thead>
-                                <tr><th>Face Photo</th><th>PIN</th><th>Name</th><th>Phone</th><th>Salary</th><th>Document</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Face Photo</th><th>PIN</th><th>Name</th><th>Phone</th><th>Salary</th><th>HD Document</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody id="adminStaffTable">
                                 <tr><td colspan="8">Loading...</td></tr>
@@ -258,7 +267,7 @@
                     </div>
                 </div>
 
-                <!-- TAB 4: ATTENDANCE LOGS (IN & OUT IMAGES) -->
+                <!-- TAB 4: ATTENDANCE LOGS (WITH DELETE BUTTON & FIXED STATUS) -->
                 <div id="tab-logs" class="section printable-report">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <h3>📋 Monthly Attendance Logs <small style="font-size:11px; color:#10b981;">🔄 Auto-refreshing</small></h3>
@@ -298,7 +307,7 @@
                                     <th>Punch IN</th>
                                     <th>Punch OUT</th>
                                     <th>Hours</th>
-                                    <th>Status</th>
+                                    <th>Correct Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -397,9 +406,9 @@
         </div>
 
         <div class="form-group" style="border:1px solid #334155; padding:8px; border-radius:6px; margin-top:8px;">
-            <label>Update Document File:</label>
-            <input type="file" id="editDocInput" accept="image/*,.pdf" onchange="handleEditDocSelect(event)">
-            <span id="editDocBadge" style="display:none; color:#10b981; font-size:11px; font-weight:bold;">✅ New Doc Attached</span>
+            <label>Update HD Document File:</label>
+            <input type="file" id="editDocInput" accept="image/*,.pdf" onchange="handleEditHDDocSelect(event)">
+            <span id="editDocBadge" style="display:none; color:#10b981; font-size:11px; font-weight:bold;">✅ New HD Doc Attached</span>
         </div>
 
         <button onclick="updateStaffDetails()" class="btn-success" style="margin-top:10px;">Save Updated Profile</button>
@@ -419,15 +428,15 @@
     </div>
 </div>
 
-<!-- Modal: Zoomable Document / Image Preview -->
+<!-- Modal: Zoomable Clear HD Document Preview -->
 <div id="previewModal" class="modal">
     <div class="modal-content" style="text-align:center;">
-        <h3 id="previewTitle">Document Preview</h3>
+        <h3 id="previewTitle">Document HD Preview</h3>
         <div class="zoom-controls" id="zoomButtonsBox">
             <button onclick="zoomImage(0.2)" class="btn-warning">🔍 Zoom In</button>
             <button onclick="zoomImage(-0.2)" class="btn-warning">🔍 Zoom Out</button>
             <button onclick="resetZoom()" class="btn-warning">🔄 Reset</button>
-            <a id="downloadBtn" download="Document" class="nav-btn" style="text-decoration:none; display:inline-block; font-size:12px; padding:6px 12px; background:#10b981;">📥 Download</a>
+            <a id="downloadBtn" download="Document" class="nav-btn" style="text-decoration:none; display:inline-block; font-size:12px; padding:6px 12px; background:#10b981;">📥 Download HD</a>
         </div>
         <div id="previewBody" class="img-zoom-container"></div>
         <button onclick="closeModal('previewModal')" class="btn-danger" style="margin-top:15px;">Close</button>
@@ -469,10 +478,8 @@
             map.on('click', function(e) {
                 const lat = e.latlng.lat.toFixed(6);
                 const lng = e.latlng.lng.toFixed(6);
-                
                 if (mapMarker) { mapMarker.setLatLng(e.latlng); } 
                 else { mapMarker = L.marker(e.latlng).addTo(map); }
-                
                 document.getElementById('locUrlInput').value = `${lat}, ${lng}`;
             });
         }
@@ -691,6 +698,31 @@
         }
     }
 
+    // High Clarity HD Document Reader (No blur/quality drop)
+    function handleHDDocSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                registeredDocBase64 = evt.target.result;
+                document.getElementById('docBadge').style.display = 'inline';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function handleEditHDDocSelect(e) {
+        const file = e.target.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                editUpdatedDocBase64 = evt.target.result;
+                document.getElementById('editDocBadge').style.display = 'inline';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     function compressAndConvertImage(file, callback, targetW=300, targetH=360) {
         const reader = new FileReader();
         reader.onload = function(event) {
@@ -711,31 +743,9 @@
         if(file) compressAndConvertImage(file, function(base64) { registeredPhotoBase64 = base64; document.getElementById('photoBadge').style.display = 'inline'; });
     }
 
-    function handleDocSelect(e) {
-        const file = e.target.files[0];
-        if(file) {
-            if(file.type.includes('image')) {
-                compressAndConvertImage(file, function(base64) { registeredDocBase64 = base64; document.getElementById('docBadge').style.display = 'inline'; }, 800, 1000);
-            } else {
-                const reader = new FileReader();
-                reader.onload = function(evt) { registeredDocBase64 = evt.target.result; document.getElementById('docBadge').style.display = 'inline'; };
-                reader.readAsDataURL(file);
-            }
-        }
-    }
-
     function handleEditPhotoSelect(e) {
         const file = e.target.files[0];
         if(file) compressAndConvertImage(file, function(base64) { editUpdatedPhotoBase64 = base64; document.getElementById('editPhotoBadge').style.display = 'inline'; });
-    }
-
-    function handleEditDocSelect(e) {
-        const file = e.target.files[0];
-        if(file) {
-            const reader = new FileReader();
-            reader.onload = function(evt) { editUpdatedDocBase64 = evt.target.result; document.getElementById('editDocBadge').style.display = 'inline'; };
-            reader.readAsDataURL(file);
-        }
     }
 
     async function saveRegisteredStaff() {
@@ -824,7 +834,7 @@
                 result.data.forEach(staff => {
                     const isActive = staff.status !== 'inactive';
                     const photoImg = staff.photo ? `<img src="${staff.photo}" class="thumb-img" onclick="openPreviewModal('Staff Face Photo', '${staff.photo}')">` : 'No Photo';
-                    const docLink = staff.documentFile ? `<button onclick="openPreviewDocModal('${staff.name} Document', '${staff.documentFile}')" class="btn-warning" style="padding:4px 8px; font-size:11px;">📄 Preview Doc</button>` : 'No Doc';
+                    const docLink = staff.documentFile ? `<button onclick="openPreviewDocModal('${staff.name} HD Document', '${staff.documentFile}')" class="btn-warning" style="padding:4px 8px; font-size:11px;">📄 HD Preview</button>` : 'No Doc';
 
                     tbody.innerHTML += `
                         <tr>
@@ -846,7 +856,7 @@
         } catch(err) { tbody.innerHTML = '<tr><td colspan="8">Error loading directory.</td></tr>'; }
     }
 
-    // Zoom & Download Preview Functions
+    // HD Document Preview & Zooming Controls
     function openPreviewModal(title, imageSrc) {
         currentZoomScale = 1;
         document.getElementById('previewTitle').innerText = title;
@@ -863,7 +873,7 @@
 
         if(docSrc.startsWith('data:application/pdf')) {
             document.getElementById('zoomButtonsBox').style.display = 'none';
-            document.getElementById('previewBody').innerHTML = `<iframe src="${docSrc}" style="width:100%; height:380px;" frameborder="0"></iframe>`;
+            document.getElementById('previewBody').innerHTML = `<iframe src="${docSrc}" style="width:100%; height:420px;" frameborder="0"></iframe>`;
         } else {
             document.getElementById('zoomButtonsBox').style.display = 'flex';
             document.getElementById('previewBody').innerHTML = `<img id="previewImg" src="${docSrc}" style="transform: scale(1); max-width:100%; border-radius:8px;">`;
@@ -876,7 +886,7 @@
         if(img) {
             currentZoomScale += amount;
             if(currentZoomScale < 0.4) currentZoomScale = 0.4;
-            if(currentZoomScale > 3.0) currentZoomScale = 3.0;
+            if(currentZoomScale > 4.0) currentZoomScale = 4.0;
             img.style.transform = `scale(${currentZoomScale})`;
         }
     }
@@ -941,6 +951,7 @@
         loadAdminData();
     }
 
+    // Attendance Log Loader with Delete Option & Corrected Status
     async function loadFilteredAttendanceLogs() {
         const month = document.getElementById('logMonthFilter').value;
         const year = document.getElementById('logYearFilter').value;
@@ -956,10 +967,21 @@
                 const outPhoto = row.punchOutPhoto ? `<img src="${row.punchOutPhoto}" class="thumb-img" onclick="openPreviewModal('Punch OUT Face Photo', '${row.punchOutPhoto}')">` : (row.punchOut ? 'No Image' : 'Working...');
 
                 let badgeClass = 'bg-present';
-                let statusLabel = 'FULL DAY';
-                if (row.workHours >= 8 || row.status === 'present') { statusLabel = 'FULL DAY'; badgeClass = 'bg-completed'; }
-                else if (row.workHours >= 4 || row.status === 'half_day') { statusLabel = 'HALF DAY'; badgeClass = 'bg-halfday'; }
-                else { statusLabel = 'ABSENT'; badgeClass = 'bg-absent'; }
+                let statusLabel = 'WORKING...';
+
+                if(!row.punchOut) {
+                    statusLabel = 'WORKING...';
+                    badgeClass = 'bg-present';
+                } else if (row.workHours >= 8) {
+                    statusLabel = 'FULL DAY';
+                    badgeClass = 'bg-completed';
+                } else if (row.workHours >= 4) {
+                    statusLabel = 'HALF DAY';
+                    badgeClass = 'bg-halfday';
+                } else {
+                    statusLabel = 'ABSENT';
+                    badgeClass = 'bg-absent';
+                }
 
                 tbody.innerHTML += `
                     <tr>
@@ -968,14 +990,30 @@
                         <td>${row.date}</td>
                         <td><strong>${row.staffId ? row.staffId.name : 'N/A'}</strong></td>
                         <td><span style="color:#10b981; font-weight:bold;">${row.punchIn || 'N/A'}</span></td>
-                        <td><span style="color:#38bdf8; font-weight:bold;">${row.punchOut || 'N/A'}</span></td>
+                        <td><span style="color:#38bdf8; font-weight:bold;">${row.punchOut || 'Working...'}</span></td>
                         <td>${row.workHours || 0} hrs</td>
                         <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
-                        <td><button onclick="openEditPunchModal('${row._id}', '${row.punchIn || ''}', '${row.punchOut || ''}')" class="btn-warning" style="padding:4px 8px; font-size:12px;">Edit Time</button></td>
+                        <td>
+                            <button onclick="openEditPunchModal('${row._id}', '${row.punchIn || ''}', '${row.punchOut || ''}')" class="btn-warning" style="padding:4px 8px; font-size:11px; margin-bottom:3px;">Edit</button>
+                            <button onclick="deleteAttendanceLog('${row._id}')" class="btn-danger" style="padding:4px 8px; font-size:11px;">Delete</button>
+                        </td>
                     </tr>
                 `;
             });
         } catch(err) { tbody.innerHTML = '<tr><td colspan="9">Error loading logs.</td></tr>'; }
+    }
+
+    async function deleteAttendanceLog(id) {
+        if(!confirm('Are you sure you want to delete this punch log entry?')) return;
+        try {
+            const res = await fetch(`${API_URL}/attendance/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if(data.success) {
+                alert('Punch Log Entry Deleted!');
+                loadFilteredAttendanceLogs();
+                loadTodayWorkingStatus();
+            } else { alert('Error deleting log!'); }
+        } catch(e) { alert('Delete failed!'); }
     }
 
     function openEditPunchModal(id, punchIn, punchOut) {
@@ -1042,9 +1080,19 @@
                 let statusLabel = 'WORKING...';
                 let badgeClass = 'bg-present';
 
-                if(row.workHours >= 8) { statusLabel = 'FULL DAY (8+ hrs)'; badgeClass = 'bg-completed'; }
-                else if(row.workHours >= 4) { statusLabel = 'HALF DAY (4-8 hrs)'; badgeClass = 'bg-halfday'; }
-                else if(row.punchOut && row.workHours < 4) { statusLabel = 'ABSENT (<4 hrs)'; badgeClass = 'bg-absent'; }
+                if(!row.punchOut) {
+                    statusLabel = 'WORKING...';
+                    badgeClass = 'bg-present';
+                } else if(row.workHours >= 8) {
+                    statusLabel = 'FULL DAY (8+ hrs)';
+                    badgeClass = 'bg-completed';
+                } else if(row.workHours >= 4) {
+                    statusLabel = 'HALF DAY (4-8 hrs)';
+                    badgeClass = 'bg-halfday';
+                } else {
+                    statusLabel = 'ABSENT (<4 hrs)';
+                    badgeClass = 'bg-absent';
+                }
 
                 tbody.innerHTML += `
                     <tr>

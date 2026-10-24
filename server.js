@@ -278,6 +278,14 @@ app.post('/api/submit-photo-geofenced-punch', async (req, res) => {
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
 
+// Delete Attendance Log Entry Endpoint
+app.delete('/api/attendance/:id', async (req, res) => {
+  try {
+    await Attendance.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
 app.post('/api/attendance/manual', async (req, res) => {
   const { staffId, date, status } = req.body;
   try {
